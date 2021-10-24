@@ -1,0 +1,9 @@
+/node_modules
+
+/.idea
+/.vs_code
+/.vs
+
+yarn.lock
+package-lock.json
+nodemon.json

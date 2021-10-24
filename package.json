@@ -1,0 +1,23 @@
+{
+  "name": "quizbotwwh",
+  "version": "0.3",
+  "description": "",
+  "main": "bot.js",
+  "scripts": {
+    "start": "node bot.js",
+    "dev": "node_modules/.bin/nodemon bot.js --config nodemon.json"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "nodemon": "^2.0.12"
+  },
+  "dependencies": {
+    "discord.js": "13.1.0",
+    "dotenv": "^10.0.0",
+    "mongoose": "^6.0.0",
+    "random": "^3.0.6",
+    "validator": "^13.6.0"
+  }
+}
