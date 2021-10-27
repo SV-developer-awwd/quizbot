@@ -92,3 +92,16 @@ setInterval(() => {
 }, 1500000)
 
 robot.login(token);
+
+//------------------------- EXPRESS SERVER FOR HEROKU -----------------------------------//
+const express = require('express')
+const PORT = process.env.PORT
+const app = express()
+
+app.get("/", (req, res) => {
+    res.status(200).send("Discord bot - Quiz bot")
+})
+
+app.listen(PORT, () => {
+    console.log(`Express has started successfully at ${PORT}`)
+})
