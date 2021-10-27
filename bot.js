@@ -86,4 +86,9 @@ setInterval(async () => {
     })
 }, 86400000)
 
+setInterval(() => {
+   const num = 1+56
+   console.log(num**2)
+}, 1500000)
+
 robot.login(token);
