@@ -11,7 +11,7 @@ const createEmbed = (args) => {
         .setAuthor(args.author ?? "")
         .setDescription(args.description ?? "")
         .setThumbnail(args.thumbnail ?? "")
-        .setImage(args.img ?? "")
+        .setImage(args.images ?? "")
         .setFooter(args.footer ?? "");
 };
 

@@ -439,10 +439,10 @@ const askQuestion = async (mess, gameID, onlyQuestions, exclude) => {
             createEmbed({
                 title: question.question,
                 author: `ID of question - ${question.questionID}`,
-                description: answersSTR,
-                images: question.images,
+                description: answersSTR
             }),
         ],
+        files: question.images
     });
 
     let usersAnswers = {};
