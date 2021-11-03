@@ -4,6 +4,8 @@
 /.vs_code
 /.vs
 
+.env.local
+
 yarn.lock
 package-lock.json
 nodemon.json
