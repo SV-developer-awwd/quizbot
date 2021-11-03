@@ -15,6 +15,8 @@ const changeMaxGamesForUser = async (robot, mess, args) => {
     let isChange = false,
         crash = false;
 
+    maxGames = isNaN(maxGames) ? 0 : maxGames
+
     await mess.channel.send({
         content: `Счетчик игр за сегодня будет сброшен в 0, количество максимальных запущенных игр за день будет изменено на ${maxGames}. Для подтверждения напишите 1. / 
   The game counter for today will be reset to 0, and the number of maximum games played for the day will be changed to ${maxGames}. To confirm, write 1.`,

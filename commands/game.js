@@ -142,8 +142,8 @@ const game = async (robot, mess, args) => {
                 embeds: [
                     createEmbed({
                         title: "Count of questions / Количество вопросов",
-                        description: `We're starting the game. How many questions do you wanna answer? Write a number or "+-" for infinite game. Remember, you always can close the game by writing "--END--". / 
-   Мы начинаем игру. На сколько вопросов вы хотите ответить? Напишите число или "+-" для бесконечного количества вопросов. Помните, вы всегда можете выйти из игры, написав "--END--". `,
+                        description: `We're starting the game. How many questions do you wanna answer? Remember, you always can close the game by writing "--END--". / 
+   Мы начинаем игру. На сколько вопросов вы хотите ответить? Помните, вы всегда можете выйти из игры, написав "--END--". `,
                         author: `Game id: ${gameID}`
                     })
                 ]
