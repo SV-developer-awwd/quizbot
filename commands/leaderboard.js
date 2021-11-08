@@ -64,7 +64,24 @@ const updateLB = async (mess, userID, value) => {
     })
 };
 
-const clearLB = async (robot, mess) => {
+const clearLB = async (robot, mess, args) => {
+    if (!mess.member.permissions.has(Permissions.FLAGS.MANAGE_ROLES)) {
+        await mess.channel.send({
+            content: "No permissions to use this command! / Недостаточно прав!",
+        });
+        return;
+    }
+
+    let user = ""
+    if (args[1] === "all") user = "all"
+    else if (mess.mentions.users.first()) user = mess.mentions.users.first().id
+    else {
+        await mess.channel.send({
+            content: "Invalid user! / Невалидный пинг!",
+        });
+        return;
+    }
+
     if (!mess.member.permissions.has(Permissions.FLAGS.ADMINISTRATOR)) {
         await mess.channel.send({
             content: "No permissions to use this command! / Недостаточно прав!",
@@ -76,7 +93,9 @@ const clearLB = async (robot, mess) => {
 
     await mess.channel.send({
         content:
-            "Do you really wanna delete leaderboard? You cannot undo it. Write TRUE if you really wanna do it / Вы реально хотите стереть весь лидерборд? Это действие невозможно отменить. Напишите TRUE, если вы реально хотите это сделать",
+            user === "all"
+                ? "Do you really wanna delete leaderboard? You cannot undo it. Write TRUE if you really wanna do it / Вы реально хотите стереть весь лидерборд? Это действие невозможно отменить. Напишите TRUE, если вы реально хотите это сделать"
+                : "Do you really wanna delete information about this man in the leaderboard? Write TRUE if you really wanna do it / Вы реально хотите стереть информацию об этом человеке в лидерборде? Напишите TRU, если вы реально хотите это сделать"
     });
     await mess.channel
         .awaitMessages({
@@ -98,13 +117,21 @@ const clearLB = async (robot, mess) => {
     if (clear) {
         await connectToDb().then(async mongoose => {
             try {
-                await serverSchema.updateOne({server: mess.guild.id}, {leaderboard: {}})
+                await serverSchema.updateOne({server: mess.guild.id}, {
+                    leaderboard:
+                        user === "all" ? {} : {
+                            [user]: 0
+                        }
+                })
             } finally {
                 await mongoose.endSession()
             }
         })
         await mess.channel.send({
-            content: "Leaderboard successfully cleared / Лидерборд успешно очищен",
+            content:
+                user === "all"
+                    ? "Leaderboard successfully cleared / Лидерборд успешно очищен"
+                    : "Information successfully cleared / Информация успешно удалена"
         });
     } else {
         await mess.channel.send({
