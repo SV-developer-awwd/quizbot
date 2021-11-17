@@ -28,11 +28,13 @@ const showLB = async (robot, mess) => {
 
         if(pointsArr[arrID].length > 1900) {
             arrID++
+            console.log("arrID++")
         }
         pointsArr[arrID] += `\n${user.username}#${user.discriminator} - ${sortedPoints[id]}`
     }
 
     for (let i = 0; i < pointsArr.length; i++) {
+        console.log("ready to send")
         await mess.channel.send({
             embeds: [
                 createEmbed({
@@ -41,6 +43,7 @@ const showLB = async (robot, mess) => {
                 }),
             ],
         });
+        console.log("sent")
     }
 };
 
