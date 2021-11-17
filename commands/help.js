@@ -1,14 +1,27 @@
 const {createEmbed} = require("../communication/embeds");
 const Discord = require("discord.js");
+const connectToDb = require("../mongoconnect");
+const serverSchema = require("../schemas/server-schema");
 
-const botinfo = (robot, mess) => {
+const botinfo = async (robot, mess) => {
+    let res = {}
+    await connectToDb().then(async (mongoose) => {
+        try {
+            res = await serverSchema.findOne({server: mess.guild.id})
+        } finally {
+            await mongoose.endSession()
+        }
+    })
+
+    const prefix = res.prefix ?? "q!"
+
     mess.channel.send({
         embeds: [
             createEmbed({
                 title: "Information about the bot / Инфорамция о боте",
-                description: `**Developed by / Разработал** - @TS prog#1121
-      **Prefix / Префикс** - q!
-      **Help command / Команда справки** - q!help`
+                description: `**Developed by / Разработал** - @TS prog#5629
+      **Prefix / Префикс** - ${prefix}
+      **Help command / Команда справки** - ${prefix}help`
             }),
         ],
     });

@@ -1,10 +1,12 @@
-require('dotenv').config()
+//require('dotenv').config()
+require('dotenv').config({
+    path: __dirname + "/.env.local"
+})
 
 const Discord = require('discord.js');
 const robot = new Discord.Client({intents: [Discord.Intents.FLAGS.GUILDS, Discord.Intents.FLAGS.GUILD_MESSAGES]});
 
 const comms = require("./comms.js");
-const fs = require('fs');
 
 let token = process.env.token;
 let prefix = process.env.prefix;

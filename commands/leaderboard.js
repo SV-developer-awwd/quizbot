@@ -19,23 +19,29 @@ const showLB = async (robot, mess) => {
         Object.entries(lb).sort(([, a], [, b]) => b - a)
     );
 
-    let pointsSTR = "";
+    let pointsArr = [""],
+        arrID = 0
     let ids = Object.keys(sortedPoints)
 
     for (const id of ids) {
         const user = await robot.users.fetch(id)
-        pointsSTR += `\n${user.username}#${user.discriminator} - ${sortedPoints[id]}`;
+
+        if(pointsArr[arrID].length > 1900) {
+            arrID++
+        }
+        pointsArr[arrID] += `\n${user.username}#${user.discriminator} - ${sortedPoints[id]}`
     }
 
-
-    await mess.channel.send({
-        embeds: [
-            createEmbed({
-                title: "Server leaderboard / Таблица лидеров сервера",
-                description: pointsSTR,
-            }),
-        ],
-    });
+    for (let i = 0; i < pointsArr.length; i++) {
+        await mess.channel.send({
+            embeds: [
+                createEmbed({
+                    title: i === 0 ? "Server leaderboard / Таблица лидеров сервера" : `Страница #${i+1} / Page #${i+1}`,
+                    description: pointsArr[i],
+                }),
+            ],
+        });
+    }
 };
 
 const updateLB = async (mess, userID, value) => {

@@ -534,11 +534,21 @@ const askQuestion = async (mess, gameID, onlyQuestions, exclude) => {
     let correctSTR = "";
     for (let i = 0; i < correctANS.length; i++) {
         correctSTR += `<@${correctANS[i]}> `;
+
+        if (i >= 10) {
+            correctSTR += `+${correctANS.length-10} users`
+            break
+        }
     }
 
     let incorrectSTR = "";
     for (let i = 0; i < incorrectANS.length; i++) {
         incorrectSTR += `<@${incorrectANS[i]}> `;
+
+        if (i >= 10) {
+            incorrectSTR += `+${incorrectANS.length-10} users`
+            break
+        }
     }
 
     if (correctANS.length > 0) {

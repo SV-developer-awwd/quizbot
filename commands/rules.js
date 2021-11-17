@@ -15,12 +15,18 @@ const rewriteRules = async (robot, mess, args) => {
         return;
     }
 
+    const newRules = args.splice(1).join(' ')
+    if(newRules.length > 1950) {
+        mess.channel.send('Too long rules. / Слишком длинные правила')
+        return
+    }
+
     try {
         await connectToDb().then(async (mongoose) => {
             try {
                 await serverSchema.updateOne(
                     {server: mess.guild.id},
-                    {rules: args.splice(1).join(' ')}
+                    {rules: newRules}
                 );
             } finally {
                 await mongoose.endSession()
@@ -91,6 +97,11 @@ const addRules = async (robot, mess, args) => {
     let rules = await getRules(mess);
     const newRule = args.splice(1).join(" ");
     rules += `\n${newRule}`;
+
+    if(rules.length > 1950) {
+        mess.channel.send(`Updated rules will be too long so I can't update them. / Обновленные правила будут слишком длинными. Я не могу обновить их.`)
+        return
+    }
 
     try {
         await connectToDb().then(async (mongoose) => {
