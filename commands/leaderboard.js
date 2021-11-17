@@ -22,19 +22,23 @@ const showLB = async (robot, mess) => {
     let pointsArr = [""],
         arrID = 0
     let ids = Object.keys(sortedPoints)
+    
+    if(ids.length > 25) {
+        await mess.channel.send({
+            content: "Generating leaderboard message... Please wait / Генерируем сообщение с лидербордом... Пожалуйста подождите"
+        })
+    }
 
     for (const id of ids) {
         const user = await robot.users.fetch(id)
 
         if(pointsArr[arrID].length > 1900) {
             arrID++
-            console.log("arrID++")
         }
         pointsArr[arrID] += `\n${user.username}#${user.discriminator} - ${sortedPoints[id]}`
     }
 
     for (let i = 0; i < pointsArr.length; i++) {
-        console.log("ready to send")
         await mess.channel.send({
             embeds: [
                 createEmbed({
@@ -43,7 +47,6 @@ const showLB = async (robot, mess) => {
                 }),
             ],
         });
-        console.log("sent")
     }
 };
 
