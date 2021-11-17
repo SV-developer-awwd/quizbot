@@ -1,7 +1,7 @@
-//require('dotenv').config()
-require('dotenv').config({
-    path: __dirname + "/.env.local"
-})
+require('dotenv').config()
+// require('dotenv').config({
+//     path: __dirname + "/.env.local"
+// })
 
 const Discord = require('discord.js');
 const robot = new Discord.Client({intents: [Discord.Intents.FLAGS.GUILDS, Discord.Intents.FLAGS.GUILD_MESSAGES]});
