@@ -1,13 +1,13 @@
-const {createEmbed} = require("../communication/embeds");
+const connectToDb = require("../../mongoconnect");
+const serverSchema = require("../../schemas/server-schema");
+const {createEmbed} = require("../../communication/embeds");
 const Discord = require("discord.js");
-const connectToDb = require("../mongoconnect");
-const serverSchema = require("../schemas/server-schema");
 
-const botinfo = async (robot, mess) => {
+const slash_botinfo = async (robot, interaction) => {
     let res = {}
     await connectToDb().then(async (mongoose) => {
         try {
-            res = await serverSchema.findOne({server: mess.guild.id})
+            res = await serverSchema.findOne({server: interaction.guild.id})
         } finally {
             await mongoose.endSession()
         }
@@ -15,7 +15,7 @@ const botinfo = async (robot, mess) => {
 
     const prefix = res.prefix ?? "q!"
 
-    await mess.channel.send({
+    await interaction.reply({
         embeds: [
             createEmbed({
                 title: "Information about the bot / Инфорамция о боте",
@@ -27,11 +27,11 @@ const botinfo = async (robot, mess) => {
     });
 };
 
-const help = async (robot, mess) => {
+const slash_help = async (robot, interaction) => {
     let res = {}
     await connectToDb().then(async (mongoose) => {
         try {
-            res = await serverSchema.findOne({server: mess.guild.id})
+            res = await serverSchema.findOne({server: interaction.guild.id})
         } finally {
             await mongoose.endSession()
         }
@@ -39,7 +39,7 @@ const help = async (robot, mess) => {
 
     const prefix = res.prefix ?? "q!"
 
-    await mess.channel.send({
+    await interaction.reply({
         embeds: [
             new Discord.MessageEmbed()
                 .setColor("#0000ff")
@@ -67,7 +67,7 @@ const help = async (robot, mess) => {
                     },
                     {
                         name: "**Game rules / Правила игры**",
-                        value: `\`\`\`${prefix}rewrite\`\`\` \`\`\`${prefix}rules\`\`\` \`\`\`${prefix}addrule\`\`\``,
+                        value: `\`\`\`${prefix}rewriterules\`\`\` \`\`\`${prefix}rules\`\`\` \`\`\`${prefix}addrule\`\`\``,
                         inline: true,
                     },
                     {
@@ -95,26 +95,26 @@ const help = async (robot, mess) => {
     });
 };
 
-const commandHelp = async (robot, mess, args) => {
+const slash_commandHelp = async (robot, interaction, options) => {
     let res = {}
     await connectToDb().then(async (mongoose) => {
         try {
-            res = await serverSchema.findOne({server: mess.guild.id})
+            res = await serverSchema.findOne({server: interaction.guild.id})
         } finally {
             await mongoose.endSession()
         }
     })
 
     const prefix = res.prefix ?? "q!"
-    const command = args[1];
+    const command = options.getString('command');
 
     switch (command) {
         case "rewriterules":
-            await mess.channel.send({
+            await interaction.reply({
                 embeds: [
                     createEmbed({
-                        title: `${prefix}rewrite`,
-                        description: `**Syntax / Синтаксис** - "${prefix}rewrite <rules>"
+                        title: `${prefix}rewriterules`,
+                        description: `**Syntax / Синтаксис** - "${prefix}rewriterules <rules>"
       **<rules>** - new rules / новые правила
       **Appointment / Назначение** - setting new game rules / установка новых правил игры
       **Minimal permissions / Минимальные права** - MANAGE_ROLES`,
@@ -123,7 +123,7 @@ const commandHelp = async (robot, mess, args) => {
             });
             break;
         case "rules":
-            await mess.channel.send({
+            await interaction.reply({
                 embeds: [
                     createEmbed({
                         title: `${prefix}rules`,
@@ -135,7 +135,7 @@ const commandHelp = async (robot, mess, args) => {
             });
             break;
         case "help":
-            await mess.channel.send({
+            await interaction.reply({
                 embeds: [
                     createEmbed({
                         title: `${prefix}help`,
@@ -147,7 +147,7 @@ const commandHelp = async (robot, mess, args) => {
             });
             break;
         case "botinfo":
-            await mess.channel.send({
+            await interaction.reply({
                 embeds: [
                     createEmbed({
                         title: `${prefix}botinfo`,
@@ -159,7 +159,7 @@ const commandHelp = async (robot, mess, args) => {
             });
             break;
         case "settimeout":
-            await mess.channel.send({
+            await interaction.reply({
                 embeds: [
                     createEmbed({
                         title: `${prefix}settimeout`,
@@ -172,7 +172,7 @@ const commandHelp = async (robot, mess, args) => {
             });
             break;
         case "command":
-            await mess.channel.send({
+            await interaction.reply({
                 embeds: [
                     createEmbed({
                         title: `${prefix}command`,
@@ -185,7 +185,7 @@ const commandHelp = async (robot, mess, args) => {
             });
             break;
         case "game":
-            await mess.channel.send({
+            await interaction.reply({
                 embeds: [
                     createEmbed({
                         title: `${prefix}game`,
@@ -198,7 +198,7 @@ const commandHelp = async (robot, mess, args) => {
             });
             break;
         case "game-flags":
-            await mess.channel.send({
+            await interaction.reply({
                 embeds: [
                     createEmbed({
                         title: `Flags for q!game`,
@@ -216,7 +216,7 @@ const commandHelp = async (robot, mess, args) => {
             });
             break;
         case "lb":
-            await mess.channel.send({
+            await interaction.reply({
                 embeds: [
                     createEmbed({
                         title: `${prefix}lb`,
@@ -228,7 +228,7 @@ const commandHelp = async (robot, mess, args) => {
             });
             break;
         case "clearLB":
-            await mess.channel.send({
+            await interaction.reply({
                 embeds: [
                     createEmbed({
                         title: `${prefix}clearLB`,
@@ -241,7 +241,7 @@ const commandHelp = async (robot, mess, args) => {
             });
             break;
         case "delete":
-            await mess.channel.send({
+            await interaction.reply({
                 embeds: [
                     createEmbed({
                         title: `${prefix}delete`,
@@ -254,7 +254,7 @@ const commandHelp = async (robot, mess, args) => {
             });
             break;
         case "add":
-            await mess.channel.send({
+            await interaction.reply({
                 embeds: [
                     createEmbed({
                         title: `${prefix}add`,
@@ -267,7 +267,7 @@ const commandHelp = async (robot, mess, args) => {
             });
             break;
         case "enableRightAnswer":
-            await mess.channel.send({
+            await interaction.reply({
                 embeds: [
                     createEmbed({
                         title: `${prefix}enableRightAnswer`,
@@ -280,7 +280,7 @@ const commandHelp = async (robot, mess, args) => {
             });
             break;
         case "edit":
-            await mess.channel.send({
+            await interaction.reply({
                 embeds: [
                     createEmbed({
                         title: `${prefix}edit`,
@@ -293,7 +293,7 @@ const commandHelp = async (robot, mess, args) => {
             });
             break;
         case "show":
-            await mess.channel.send({
+            await interaction.reply({
                 embeds: [
                     createEmbed({
                         title: `${prefix}show`,
@@ -306,7 +306,7 @@ const commandHelp = async (robot, mess, args) => {
             })
             break;
         case "maxgames":
-            await mess.channel.send({
+            await interaction.reply({
                 embeds: [
                     createEmbed({
                         title: `${prefix}maxgames`,
@@ -319,7 +319,7 @@ const commandHelp = async (robot, mess, args) => {
             });
             break;
         case "addrule":
-            await mess.channel.send({
+            await interaction.reply({
                 embeds: [
                     createEmbed({
                         title: `${prefix}addrule`,
@@ -332,7 +332,7 @@ const commandHelp = async (robot, mess, args) => {
             });
             break;
         case "cleargames":
-            await mess.channel.send({
+            await interaction.reply({
                 embeds: [
                     createEmbed({
                         title: `${prefix}cleargames`,
@@ -345,7 +345,7 @@ const commandHelp = async (robot, mess, args) => {
             });
             break;
         case "gamescount":
-            await mess.channel.send({
+            await interaction.reply({
                 embeds: [
                     createEmbed({
                         title: `${prefix}gamescount`,
@@ -357,7 +357,7 @@ const commandHelp = async (robot, mess, args) => {
             });
             break;
         case "setgamestartperms":
-            await mess.channel.send({
+            await interaction.reply({
                 embeds: [
                     createEmbed({
                         title: `${prefix}setgamestartperms `,
@@ -370,7 +370,7 @@ const commandHelp = async (robot, mess, args) => {
             });
             break;
         case "exportastxt":
-            await mess.channel.send({
+            await interaction.reply({
                 embeds: [
                     createEmbed({
                         title: `${prefix}exportastxt`,
@@ -383,7 +383,7 @@ const commandHelp = async (robot, mess, args) => {
             });
             break;
         case "prefix":
-            await mess.channel.send({
+            await interaction.reply({
                 embeds: [
                     createEmbed({
                         title: `${prefix}prefix`,
@@ -397,10 +397,10 @@ const commandHelp = async (robot, mess, args) => {
             });
             break;
         default:
-            await mess.channel.send({
+            await interaction.reply({
                 content: "Command not found / Команда не найдена",
             });
     }
 };
 
-module.exports = {botinfo, help, commandHelp};
+module.exports = {slash_botinfo, slash_help, slash_commandHelp}

@@ -1,24 +1,24 @@
-const connectToDb = require("../mongoconnect");
-const serverSchema = require("../schemas/server-schema");
-const {createEmbed} = require("../communication/embeds");
+const connectToDb = require("../../mongoconnect");
+const serverSchema = require("../../schemas/server-schema");
+const {createEmbed} = require("../../communication/embeds");
 const {Permissions} = require("discord.js");
-const {getRules} = require("../communication/getRules");
+const {getRules} = require("../../communication/getRules");
 
-const rewriteRules = async (robot, mess, args) => {
+const slash_rewriteRules = async (robot, interaction, options) => {
     if (
-        !mess.member.permissions.has(
+        !interaction.member.permissions.has(
             Permissions.FLAGS.MANAGE_ROLES
         )
     ) {
-        await mess.channel.send({
+        await interaction.reply({
             content: "No permissions to use this command! / Недостаточно прав!",
         });
         return;
     }
+    const newRules = options.getString('rules')
 
-    const newRules = args.splice(1).join(' ')
     if(newRules.length > 1950) {
-        mess.channel.send('Too long rules. / Слишком длинные правила')
+        interaction.reply('Too long rules. / Слишком длинные правила')
         return
     }
 
@@ -26,14 +26,14 @@ const rewriteRules = async (robot, mess, args) => {
         await connectToDb().then(async (mongoose) => {
             try {
                 await serverSchema.updateOne(
-                    {server: mess.guild.id},
+                    {server: interaction.guild.id},
                     {rules: newRules}
                 );
             } finally {
                 await mongoose.endSession()
             }
         });
-        await mess.channel.send({
+        await interaction.reply({
             embeds: [
                 createEmbed({
                     title: `Rules successfully updated.\n Правила успешно обновлены.`,
@@ -41,25 +41,25 @@ const rewriteRules = async (robot, mess, args) => {
             ],
         });
     } catch (e) {
-        await mess.channel.send({
+        await interaction.reply({
             content: `Uncaught Error, try again please.
     Ошибка! Попробуйте еще раз.`,
         });
     }
 };
 
-const showRules = async (robot, mess) => {
+const slash_showRules = async (robot, interaction) => {
     let res = {};
     await connectToDb().then(async (mongoose) => {
         try {
-            res = await serverSchema.findOne({server: mess.guild.id});
+            res = await serverSchema.findOne({server: interaction.guild.id});
         } finally {
-           await mongoose.endSession()
+            await mongoose.endSession()
         }
     });
     const rules = res.rules;
 
-    await mess.channel.send({
+    await interaction.reply({
         embeds: [
             createEmbed({
                 title: "Правила игры: ",
@@ -69,24 +69,24 @@ const showRules = async (robot, mess) => {
     });
 };
 
-const addRules = async (robot, mess, args) => {
+const slash_addRules = async (robot, interaction, options) => {
     if (
-        !mess.member.permissions.has(
+        !interaction.member.permissions.has(
             Permissions.FLAGS.MANAGE_ROLES
         )
     ) {
-        await mess.channel.send({
+        await interaction.channel.send({
             content: "No permissions to use this command! / Недостаточно прав!",
         });
         return;
     }
 
-    let rules = await getRules(mess.guild.id);
-    const newRule = args.splice(1).join(" ");
+    let rules = await getRules(interaction.guild.id);
+    const newRule = options.getString('rule')
     rules += `\n${newRule}`;
 
     if(rules.length > 1950) {
-        mess.channel.send(`Updated rules will be too long so I can't update them. / Обновленные правила будут слишком длинными. Я не могу обновить их.`)
+        interaction.reply(`Updated rules will be too long so I can't update them. / Обновленные правила будут слишком длинными. Я не могу обновить их.`)
         return
     }
 
@@ -98,7 +98,7 @@ const addRules = async (robot, mess, args) => {
                 await mongoose.endSession()
             }
         });
-        await mess.channel.send({
+        await interaction.reply({
             embeds: [
                 createEmbed({
                     title: `Rules successfully updated.\n Правила успешно обновлены.`,
@@ -106,11 +106,11 @@ const addRules = async (robot, mess, args) => {
             ],
         });
     } catch (e) {
-        await mess.channel.send({
+        await interaction.reply({
             content: `Uncaught Error, try again please.
     Ошибка! Попробуйте еще раз.`,
         });
     }
 };
 
-module.exports = {showRules, rewriteRules, addRules};
+module.exports = {slash_rewriteRules, slash_showRules, slash_addRules}

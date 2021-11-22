@@ -158,9 +158,7 @@ const game = async (robot, mess, args) => {
             .then((collected) => {
                 const ans = collected.first().content;
 
-                if (ans === "+-") {
-                    countOfQuestions = Infinity;
-                } else if (ans === "--END--") {
+                if (ans === "--END--") {
                     throw new Error("game over");
                 } else {
                     countOfQuestions = parseInt(ans);
@@ -193,14 +191,6 @@ const game = async (robot, mess, args) => {
         countOfQuestions = specialIDS.length
     }
 
-    if (countOfQuestions === Infinity) {
-        while (!isGameOver) {
-            await askQuestion(mess, gameID, [], specialIDS).catch(() => {
-                isGameOver = true;
-            });
-        }
-    }
-
     if (isGameOver) {
         await mess.channel.send(
             "Game over! Thanks for playing. / Игра окончена, спасибо за участие!"
@@ -211,7 +201,7 @@ const game = async (robot, mess, args) => {
     for (let i = 0; i < countOfQuestions; i++) {
         const err = onlyChoseQuestions
             ? await askQuestion(mess, gameID, specialIDS, [])
-            : await askQuestion(mess, gameID, [],  [])
+            : await askQuestion(mess, gameID, [], [])
         if (!!err.message) {
             break;
         }

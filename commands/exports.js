@@ -3,6 +3,7 @@ const connectToDb = require("../mongoconnect");
 const serverSchema = require("../schemas/server-schema");
 const fs = require("fs");
 const path = require("path");
+const {txtGenerator} = require("../communication/exportGenerators");
 
 const exportAsTXT = async (robot, mess, args) => {
     if (
@@ -32,38 +33,11 @@ const exportAsTXT = async (robot, mess, args) => {
     qIDs.pop()
 
     if (qIDs.length < 1) {
-        await mess.channel.send({content: "No questions to export! / Нет вопросов для эекспорта!"})
+        await mess.channel.send({content: "No questions to export! / Нет вопросов для экспорта!"})
         return
     }
 
-    const all = qIDs.indexOf("all") !== -1
-
-    for (let i = 0; i < qIDs.length; i++) {
-        qIDs[i] = parseInt(qIDs[i])
-    }
-
-    let string = ""
-    if (all) {
-        for (let i = 0; i < questions.length; i++) {
-            string += `ID: ${questions[i].questionID}
-        Q: ${questions[i].question}
-        Answers: ${JSON.stringify(questions[i].answers)}
-        Right answer: ${questions[i].answer}
-        Attachments: ${JSON.stringify(questions[i].images)}\n
-        ---------------------------------------------------\n`
-        }
-    } else {
-        for (let i = 0; i < questions.length; i++) {
-            if (qIDs.indexOf(questions[i].questionID) !== -1) {
-                string += `ID: ${questions[i].questionID}
-        Q: ${questions[i].question}
-        Answers: ${JSON.stringify(questions[i].answers)}
-        Right answer: ${questions[i].answer}
-        Attachments: ${JSON.stringify(questions[i].images)}\n
-        ---------------------------------------------------\n`
-            }
-        }
-    }
+    const string = txtGenerator(qIDs, questions)
 
     try {
         await fs.writeFile(path.resolve(__dirname, "..", "storage", "questions.txt"), string, () => {

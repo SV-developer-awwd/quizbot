@@ -11,15 +11,13 @@ const changeMaxGamesForUser = async (robot, mess, args) => {
         return;
     }
 
-    let maxGames = args[1] === "+-" ? Infinity : parseInt(args[1]);
+    let maxGames = parseInt(args[1]) <= 0 ? NaN : parseInt(args[1]);
     let isChange = false,
         crash = false;
 
-    maxGames = isNaN(maxGames) ? 0 : maxGames
-
     await mess.channel.send({
-        content: `Счетчик игр за сегодня будет сброшен в 0, количество максимальных запущенных игр за день будет изменено на ${maxGames}. Для подтверждения напишите 1. / 
-  The game counter for today will be reset to 0, and the number of maximum games played for the day will be changed to ${maxGames}. To confirm, write 1.`,
+        content: `Счетчик игр за сегодня будет сброшен в 0, количество максимальных запущенных игр за день будет изменено на ${maxGames.isNaN() ? "бесконечное" : maxGames}. Для подтверждения напишите 1. / 
+  The game counter for today will be reset to 0, and the number of maximum games played for the day will be changed to ${maxGames.isNaN() ? "infinity" : maxGames}. To confirm, write 1.`,
     });
     await mess.channel
         .awaitMessages({
@@ -33,10 +31,6 @@ const changeMaxGamesForUser = async (robot, mess, args) => {
                 isChange = true;
             }
         });
-
-    if (maxGames <= 0) {
-        maxGames = NaN
-    }
 
     if (isChange) {
         await connectToDb().then(async (mongoose) => {
@@ -144,7 +138,6 @@ const clearGamesList = async (robot, mess, args) => {
 };
 
 const showGames = async (robot, mess) => {
-    console.log(1)
     let res = {}
     await connectToDb().then(async mongoose => {
         try {
