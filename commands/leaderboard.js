@@ -1,8 +1,11 @@
 const connectToDb = require('../mongoconnect');
 const serverSchema = require("../schemas/server-schema");
 
-const {createEmbed} = require("../communication/embeds");
-const {Permissions} = require("discord.js");
+const {createEmbed} = require("../communication/embeds/embeds");
+const {permsCheck} = require("../communication/permsCheck");
+const {invalidUserError, operationTerminatedMsg} = require("../communication/embeds/error-messages");
+const {defaultSuccessMsg} = require("../communication/embeds/success-messages");
+const {confirmActions} = require("../communication/interactions/actionsConfirmation");
 
 const showLB = async (robot, mess) => {
     let res = {}
@@ -41,10 +44,10 @@ const showLB = async (robot, mess) => {
     for (let i = 0; i < pointsArr.length; i++) {
         await mess.channel.send({
             embeds: [
-                createEmbed({
+                await createEmbed({
                     title: i === 0 ? "Server leaderboard / Таблица лидеров сервера" : `Страница #${i+1} / Page #${i+1}`,
                     description: pointsArr[i],
-                }),
+                }, mess.guild.id),
             ],
         });
     }
@@ -77,54 +80,21 @@ const updateLB = async (mess, userID, value) => {
 };
 
 const clearLB = async (robot, mess, args) => {
-    if (!mess.member.permissions.has(Permissions.FLAGS.MANAGE_ROLES)) {
-        await mess.channel.send({
-            content: "No permissions to use this command! / Недостаточно прав!",
-        });
-        return;
-    }
+    if (await permsCheck(mess, "MANAGE_ROLES")) return
 
     let user = ""
     if (args[1] === "all") user = "all"
     else if (mess.mentions.users.first()) user = mess.mentions.users.first().id
     else {
-        await mess.channel.send({
-            content: "Invalid user! / Невалидный пинг!",
-        });
+        await invalidUserError(mess)
         return;
     }
 
-    if (!mess.member.permissions.has(Permissions.FLAGS.ADMINISTRATOR)) {
-        await mess.channel.send({
-            content: "No permissions to use this command! / Недостаточно прав!",
-        });
-        return;
-    }
+    if (await permsCheck(mess, "ADMINISTRATOR")) return
 
     let clear = false
 
-    await mess.channel.send({
-        content:
-            user === "all"
-                ? "Do you really wanna delete leaderboard? You cannot undo it. Write TRUE if you really wanna do it / Вы реально хотите стереть весь лидерборд? Это действие невозможно отменить. Напишите TRUE, если вы реально хотите это сделать"
-                : "Do you really wanna delete information about this man in the leaderboard? Write TRUE if you really wanna do it / Вы реально хотите стереть информацию об этом человеке в лидерборде? Напишите TRU, если вы реально хотите это сделать"
-    });
-    await mess.channel
-        .awaitMessages({
-            filter: () => mess.content,
-            time: 30000,
-            max: 1,
-            errors: ["time"],
-        })
-        .then((collected) => {
-            if (
-                collected.first().content === "TRUE" ||
-                collected.first().content === "true" ||
-                collected.first().content === "True"
-            ) {
-                clear = true;
-            }
-        }).catch(() => clear = false)
+    clear = await confirmActions(mess)
 
     if (clear) {
         await connectToDb().then(async mongoose => {
@@ -139,16 +109,9 @@ const clearLB = async (robot, mess, args) => {
                 await mongoose.endSession()
             }
         })
-        await mess.channel.send({
-            content:
-                user === "all"
-                    ? "Leaderboard successfully cleared / Лидерборд успешно очищен"
-                    : "Information successfully cleared / Информация успешно удалена"
-        });
+        await defaultSuccessMsg(mess)
     } else {
-        await mess.channel.send({
-            content: "Operation stopped / Операция остановлена",
-        });
+        await operationTerminatedMsg(mess)
     }
 };
 

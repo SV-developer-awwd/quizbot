@@ -1,21 +1,16 @@
-const {Permissions, MessageAttachment} = require("discord.js");
-const connectToDb = require("../../mongoconnect");
-const serverSchema = require("../../schemas/server-schema");
+const {MessageAttachment} = require("discord.js");
 const fs = require("fs");
 const path = require("path");
+const random = require('random')
+
+const connectToDb = require("../../mongoconnect");
+const serverSchema = require("../../schemas/server-schema");
 const {txtGenerator} = require("../../communication/exportGenerators");
+const {permsCheck} = require("../../communication/permsCheck");
+const {uncaughtError} = require("../../communication/embeds/error-messages");
 
 const slash_exportAsTXT = async (robot, interaction, options) => {
-    if (
-        !interaction.member.permissions.has(
-            Permissions.FLAGS.MANAGE_ROLES
-        )
-    ) {
-        await interaction.reply({
-            content: "No permissions to use this command! / Недостаточно прав!",
-        });
-        return;
-    }
+    if (await permsCheck(interaction, "MANAGE_ROLES")) return
 
     let res = {}
     await connectToDb().then(async mongoose => {
@@ -38,16 +33,20 @@ const slash_exportAsTXT = async (robot, interaction, options) => {
     const string = txtGenerator(qIDs, questions)
 
     try {
-        await fs.writeFile(path.resolve(__dirname, "..", "..", "storage", "questions.txt"), string, () => {
+        const requestID = random.int(100000, 999999)
+        await fs.writeFile(path.resolve(__dirname, "..", "..", "storage", `questions-${requestID}.txt`), string, () => {
         })
 
-        const attachment = new MessageAttachment(path.resolve(__dirname, "..", "..", "storage", "questions.txt"), 'questions.txt')
+        const attachment = new MessageAttachment(path.resolve(__dirname, "..", "..", "storage", `questions-${requestID}.txt`), `questions${requestID}.txt`)
         await interaction.reply({
             content: "Success!",
             files: [attachment]
         })
+
+        await fs.unlink(path.resolve(__dirname, "..", "..", "storage", `questions-${requestID}.txt`), () => {
+        })
     } catch (e) {
-        await interaction.reply("Uncaught error! Please try again / Ошибка! Пожалуйста попробуйте снова")
+        await uncaughtError(interaction, true)
     }
 }
 

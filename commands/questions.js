@@ -1,22 +1,23 @@
 const connectToDb = require('../mongoconnect');
 const serverSchema = require("../schemas/server-schema");
-const {createEmbed} = require("../communication/embeds");
-const {updateLB} = require("./leaderboard");
-const {Permissions} = require("discord.js");
+const {createEmbed} = require("../communication/embeds/embeds");
 const randomizer = require("random");
-const validator = require("validator");
+const {permsCheck} = require("../communication/permsCheck");
+const {
+    noResponseError,
+    uncaughtError,
+    invalidQuestionID,
+    operationTerminatedMsg
+} = require("../communication/embeds/error-messages");
+const {defaultSuccessMsg} = require("../communication/embeds/success-messages");
+const {awaitMessages} = require("../communication/interactions/awaitMessages");
+const {chooseOption} = require("../communication/interactions/chooseOptionButtons");
+const {chooseOptionMenu} = require("../communication/interactions/chooseOptionMenu");
+const {getQIDs} = require("../communication/interactions/getQIDs");
+const {confirmActions} = require("../communication/interactions/actionsConfirmation");
 
 const addQuestion = async (robot, mess, args) => {
-    if (
-        !mess.member.permissions.has(
-            Permissions.FLAGS.MANAGE_ROLES
-        )
-    ) {
-        await mess.channel.send({
-            content: "No permissions to use this command! / Недостаточно прав!",
-        });
-        return;
-    }
+    if (await permsCheck(mess, "MANAGE_ROLES")) return
     const count = args[1] !== "" ? parseInt(args[1]) : 1
 
     for (let i = 0; i < count; i++) {
@@ -30,185 +31,123 @@ const addQuestion = async (robot, mess, args) => {
         })
         let questions = res.questions;
 
-        let newQuestionID = randomizer.int(10000, 99999),
-            uniqueID = false;
-        const questionIDs = res.questionIDs;
+        let newQuestionID = randomizer.int(10000, 99999)
 
-        while (!uniqueID) {
-            if (questionIDs.indexOf(newQuestionID) !== -1) {
-                newQuestionID = randomizer.int(10000, 99999);
-            } else {
-                questionIDs.push(newQuestionID);
-                uniqueID = true;
-            }
-        }
-
-        let countOfAnswers = 0,
+        let newQuestion = await awaitMessages(mess, {content: "Please write a question / Пожалуйста напишите вопрос"}),
+            countOfAnswers = await awaitMessages(mess, {content: "Please write count of answers. / Пожалуйста напишите количество ответов для вопроса"}),
             answers = [],
+            rightAnswer = 0,
             countOfImages = 0,
-            images = [],
-            newQuestion = "",
-            end = false;
+            images = []
 
-        await mess.channel.send({
-            content: "Please write a question / Пожалуйста напишите вопрос",
-        });
-        await mess.channel
-            .awaitMessages({
-                filter: () => mess.content,
-                max: 1,
-                time: 30000,
-                errors: ["time"],
-            })
-            .then((collected) => {
-                newQuestion = collected.first().content;
-            })
-            .catch(() => {
-                end = true
-            });
-
-        if (end) {
-            await mess.channel.send(
-                "Unfortunately, due to lack of response, the operation was canceled. / К сожалению из-за отсутствия ответа операция была прервана."
-            );
-            return;
-        }
-
-        await mess.channel.send({
-            content:
-                "Please write count of answers. / Пожалуйста напишите количество ответов для вопроса",
-        });
-        await mess.channel
-            .awaitMessages({
-                filter: () => mess.content,
-                max: 1,
-                time: 30000,
-                errors: ["time"],
-            })
-            .then((collected) => {
-                countOfAnswers = collected.first().content;
-            })
-            .catch(() => {
-                end = true
-            });
-
-        if (end) {
-            await mess.channel.send(
-                "Unfortunately, due to lack of response, the operation was canceled. / К сожалению из-за отсутствия ответа операция была прервана."
-            );
+        if (!newQuestion || !countOfAnswers) {
+            await noResponseError(mess)
             return;
         }
 
         for (let i = 0; i < countOfAnswers; i++) {
-            await mess.channel.send({
+            const ans = await awaitMessages(mess, {
                 content: `Please write ${i === 0 ? "first" : "next"} answer for question /
       Пожалуйста напишите ${
                     i === 0 ? "первый" : "следующий"
-                } ответ для вопроса`,
-            });
-            await mess.channel
-                .awaitMessages({
-                    filter: () => mess.content,
-                    max: 1,
-                    time: 30000,
-                    errors: ["time"],
-                })
-                .then((collected) => {
-                    answers.push(collected.first().content);
-                })
-                .catch(() => {
-                    end = true
-                });
-            if (end) {
-                await mess.channel.send(
-                    "Unfortunately, due to lack of response, the operation was canceled. / К сожалению из-за отсутствия ответа операция была прервана."
-                );
+                } ответ для вопроса`
+            })
+
+            if (!ans) {
+                await noResponseError(mess)
                 return;
             }
         }
 
-        let rightAnswer = 0;
-
-        await mess.channel.send({
+        rightAnswer = await awaitMessages(mess, {
             content: `Please write the correct answer number for the question /
-    Пожалуйста напишите правильный номер ответа для вопроса`,
-        });
-        await mess.channel
-            .awaitMessages({
-                filter: () => mess.content,
-                max: 1,
-                time: 30000,
-                errors: ["time"],
-            })
-            .then((collected) => {
-                rightAnswer = parseInt(collected.first().content);
-            }).catch(() => {
-                end = true
-            })
+    Пожалуйста напишите правильный номер ответа для вопроса`
+        })
 
-        if (end) {
-            await mess.channel.send("Unfortunately, due to lack of response, the operation was canceled. / К сожалению из-за отсутствия ответа операция была прервана.")
+        if (!rightAnswer) {
+            await noResponseError(mess)
             return
         }
 
-        await mess.channel.send({
-            content:
-                "Please write count of images for question. Write 0 if you don't want to attach images. / Пожалуйста напишите количество картинок для вопроса. Напишите 0, если не хотите прикреплять картинки",
-        });
-        await mess.channel
-            .awaitMessages({
-                filter: () => mess.content,
-                max: 1,
-                time: 30000,
-                errors: ["time"],
-            })
-            .then((collected) => {
-                countOfImages = collected.first().content;
-            }).catch(() => {
-                end = true
-            })
-        if (end) {
-            await mess.channel.send("Unfortunately, due to lack of response, the operation was canceled. / К сожалению из-за отсутствия ответа операция была прервана.")
+        countOfImages = await chooseOptionMenu(mess, [
+            {
+                label: 'No images',
+                description: '',
+                value: 'zero',
+            },
+            {
+                label: '1',
+                description: '',
+                value: 'one',
+            },
+            {
+                label: '2',
+                description: '',
+                value: 'two',
+            },
+            {
+                label: '3',
+                description: '',
+                value: 'three',
+            },
+            {
+                label: '4',
+                description: '',
+                value: 'four',
+            },
+            {
+                label: '5',
+                description: '',
+                value: 'five',
+            }
+        ], "Please choose count of images for question. / Пожалуйста выберите количество картинок для вопроса. ")[0]
+
+        switch (countOfImages) {
+            case "zero":
+                countOfImages = 0;
+                break
+            case "one":
+                countOfImages = 1;
+                break
+            case "two":
+                countOfImages = 2;
+                break
+            case "three":
+                countOfImages = 3;
+                break
+            case "four":
+                countOfImages = 4;
+                break
+            case "five":
+                countOfImages = 5;
+                break
+            default:
+        }
+
+        if (!countOfImages) {
+            await noResponseError(mess)
             return
         }
 
         for (let i = 0; i < countOfImages; i++) {
-            await mess.channel.send({
+            let image = await awaitMessages({
                 content: `Please write ${
                     i === 0 ? "first" : "next"
                 } link with image. Image must be uploaded to discord as message earlier. /
       Пожалуйста напишите ${
                     i === 0 ? "первую" : "следующую"
                 } ссылку с картинкой. Картинка должна быть загружена в виде сообщения в discord ранее.`,
-            });
-            await mess.channel
-                .awaitMessages({
-                    filter: () => mess.content,
-                    max: 1,
-                    time: 30000,
-                    errors: ["time"],
-                })
-                .then(async (collected) => {
-                    let image = collected.first().content;
-
-                    if (
-                        image.indexOf("https://media.discordapp.net/attachments/") === -1 ||
-                        image.length < 42
-                    ) {
-                        await mess.channel.send(
-                            "Invalid URL to picture. / Невалидная ссылка на картинку"
-                        );
-                        countOfImages++;
-                    } else {
-                        images.push(image.split("?")[0]);
-                    }
-                }).catch(() => {
-                    end = true
-                })
-
-            if (end) {
-                await mess.channel.send("Unfortunately, due to lack of response, the operation was canceled. / К сожалению из-за отсутствия ответа операция была прервана.")
-                return
+            })
+            if (
+                image.indexOf("https://media.discordapp.net/attachments/") === -1 ||
+                image.length < 42
+            ) {
+                await mess.channel.send(
+                    {content: "Invalid URL to picture. / Невалидная ссылка на картинку"}
+                );
+                countOfImages++;
+            } else {
+                images.push(image.split("?")[0]);
             }
         }
 
@@ -234,32 +173,20 @@ const addQuestion = async (robot, mess, args) => {
             })
             await mess.channel.send({
                 embeds: [
-                    createEmbed({
+                    await createEmbed({
                         title: `Question successfully added.\n Вопрос успешно добавлен.`,
                         author: `ID of question - ${newQuestionID}`,
-                    }),
+                    }, mess.guild.id),
                 ],
             });
         } catch (e) {
-            await mess.channel.send({
-                content: `Uncaught Error, try again please.
-    Ошибка! Попробуйте еще раз.`,
-            });
+            await uncaughtError(mess)
         }
     }
 };
 
 const deleteQuestion = async (robot, mess, args) => {
-    if (
-        !mess.member.permissions.has(
-            Permissions.FLAGS.MANAGE_ROLES
-        )
-    ) {
-        await mess.channel.send({
-            content: "No permissions to use this command! / Недостаточно прав!",
-        });
-        return;
-    }
+    if (await permsCheck(mess, "MANAGE_ROLES")) return
     let res = {}
     await connectToDb().then(async mongoose => {
         try {
@@ -269,12 +196,10 @@ const deleteQuestion = async (robot, mess, args) => {
         }
     })
     let questions = res.questions;
-    let qIDs = args;
-    qIDs.pop()
-    qIDs.shift();
+    let qIDs = await getQIDs(mess)
 
     let deleteAll = false
-    if(qIDs.indexOf("all") !== -1) {
+    if (qIDs.indexOf("all") !== -1) {
         deleteAll = true
     }
 
@@ -284,16 +209,7 @@ const deleteQuestion = async (robot, mess, args) => {
         }
 
         if (qIDs.length >= 5) {
-            if (
-                !mess.member.permissions.has(
-                    Permissions.FLAGS.ADMINISTRATOR
-                )
-            ) {
-                await mess.channel.send({
-                    content: "No permissions to use this command! / Недостаточно прав!",
-                });
-                return;
-            }
+            if (await permsCheck(mess, "ADMINISTRATOR")) return
         }
 
         for (let q of questions) {
@@ -306,35 +222,9 @@ const deleteQuestion = async (robot, mess, args) => {
             }
         }
     } else {
-        if (
-            !mess.member.permissions.has(
-                Permissions.FLAGS.ADMINISTRATOR
-            )
-        ) {
-            await mess.channel.send({
-                content: "No permissions to use this command! / Недостаточно прав!",
-            });
-            return;
-        }
+        if (await permsCheck(mess, "ADMINISTRATOR")) return
 
-        let clear = false
-        await mess.channel.send({
-            content:
-                "Do you really wanna delete all questions? You cannot undo it. Write TRUE if you really wanna do it / Вы реально хотите удалить все вопросы? Это действие невозможно отменить. Напишите TRUE, если вы реально хотите это сделать",
-        });
-        await mess.channel
-            .awaitMessages({
-                filter: () => mess.content,
-                time: 30000,
-                max: 1,
-                errors: ["time"],
-            })
-            .then((collected) => {
-                if (collected.first().content.toLowerCase() === "true") {
-                    clear = true;
-                }
-            }).catch(() => clear = false)
-
+        let clear = await confirmActions(mess)
         if (clear) {
             questions = []
         }
@@ -348,234 +238,14 @@ const deleteQuestion = async (robot, mess, args) => {
                 await mongoose.endSession()
             }
         })
-        await mess.channel.send({
-            embeds: [
-                createEmbed({
-                    title: `Question(s) successfully deleted.\n Вопрос(ы) успешно удален(ы).`,
-                }),
-            ],
-        });
+        await defaultSuccessMsg(mess)
     } catch (e) {
-        await mess.channel.send({
-            content: `Uncaught Error, try again please.
-      Ошибка! Попробуйте еще раз.`,
-        });
+        await uncaughtError(mess)
     }
-};
-
-const getQuestion = async (mess, specialIDS) => {
-    let res = {}
-    await connectToDb().then(async mongoose => {
-        try {
-            res = await serverSchema.findOne({server: mess.guild.id})
-        } finally {
-            await mongoose.endSession()
-        }
-    })
-    let questions = res.questions;
-    questions = questions.filter((question) => question !== null)
-
-    if (specialIDS.onlyQuestions.length < 1  && specialIDS.exclude.length < 1) {
-        //no -only or -exclude
-        return questions[randomizer.int(0, questions.length)]
-    } else if (specialIDS.onlyQuestions.length >= 1 && specialIDS.exclude.length < 1) {
-        // -only
-        let questionsArr = []
-        for (let i = 0; i < questions.length; i++) {
-            if (specialIDS.onlyQuestions.indexOf(questions[i].questionID) !== -1) {
-                questionsArr.push(questions[i])
-            }
-        }
-
-        return questionsArr[randomizer.int(0, questions.length)]
-    } else if (specialIDS.onlyQuestions.length < 1 && specialIDS.exclude.length >= 1) {
-        // -exclude
-        const q = questions[randomizer.int(0, questions.length)]
-        if (specialIDS.exclude.indexOf(q.questionID) !== -1) {
-            return getQuestion(mess, specialIDS)
-        }
-
-        return q
-    }
-};
-
-const askQuestion = async (mess, gameID, onlyQuestions, exclude) => {
-    let res = {}
-    await connectToDb().then(async mongoose => {
-        try {
-            res = await serverSchema.findOne({server: mess.guild.id})
-        } finally {
-            await mongoose.endSession()
-        }
-    })
-    let timeout = res.questionTimeout
-
-    const specialIDS = {
-        onlyQuestions, exclude
-    }
-
-    let question = await getQuestion(mess, specialIDS),
-        answers = [],
-        notOK = true
-
-    do {
-        try {
-            answers = question.answers;
-            notOK = false
-        } catch (e) {
-            question = await getQuestion(mess, specialIDS)
-            notOK = true
-        }
-    } while (notOK)
-
-    let answersSTR = ``;
-
-    for (let i = 1; i <= answers.length; i++) {
-        answersSTR += `\n${i}. ${answers[i - 1]}`;
-    }
-
-    await mess.channel.send({
-        embeds: [
-            createEmbed({
-                title: question.question,
-                author: `ID of question - ${question.questionID}`,
-                description: answersSTR
-            }),
-        ],
-        files: question.images
-    });
-
-    let usersAnswers = {};
-    let isGameOver = false;
-    let arr = [];
-
-    await mess.channel.send({
-        content: `Write number of answer. You have ${
-            timeout / 1000
-        } seconds to answer. / Напишите номер ответа. У вас есть ${
-            timeout / 1000
-        } секунд, чтобы ответить.`,
-    });
-    await mess.channel
-        .awaitMessages({
-            filter: () => mess.content,
-            time: timeout,
-            errors: [],
-        })
-        .then((collected) => {
-            arr = Array.from(collected.values());
-            if (arr.includes("--END--")) {
-                throw new Error("game over")
-            }
-        })
-        .catch((e) => {
-            isGameOver = true;
-            if (e.message === "game over") {
-                return new Error("game over");
-            }
-        });
-    if (isGameOver) {
-        mess.channel.send("Game over / Игра окончена");
-        return new Error("game over");
-    }
-    await mess.channel.send(
-        "Time is up, all answers are recorded! / Время вышло, все ответы записаны!"
-    );
-
-    let isCommandEnd = false;
-    for (let i = 0; i < arr.length; i++) {
-        const validType = validator.isInt(arr[i].content)
-        usersAnswers[arr[i].author.id] = validType ? parseInt(arr[i].content) : false
-
-        if (arr[i].content === "--END--") {
-            isCommandEnd = true;
-            break;
-        }
-    }
-
-    if (isCommandEnd) {
-        return new Error("game over");
-    }
-
-    let correctANS = [],
-        incorrectANS = []
-
-    for (const user in usersAnswers) {
-        if (!validator.isInt(String(usersAnswers[user])) && usersAnswers[user] !== "--END--") {
-            incorrectANS.push(user)
-            continue
-        }
-
-        if (usersAnswers[user] === "--END--") {
-            throw new Error('game over')
-        }
-
-        if (question.answer === usersAnswers[user]) {
-            correctANS.push(user);
-        } else {
-            incorrectANS.push(user);
-        }
-    }
-
-    if (correctANS.length === 0 && res.showRightAnswer) {
-        await mess.channel.send(
-            `Unfortunately, no one gave the correct answer, but this was the answer number ${question.answer} / К сожалению никто не дал правильный ответ, а это был ответ номер ${question.answer}`
-        );
-        return "";
-    }
-
-    for (let i = 0; i < correctANS.length; i++) {
-        await updateLB(mess, correctANS[i], 1);
-    }
-
-    correctANS = [...new Set(correctANS)];
-    incorrectANS = [...new Set(incorrectANS)];
-
-    let correctSTR = "";
-    for (let i = 0; i < correctANS.length; i++) {
-        correctSTR += `<@${correctANS[i]}> `;
-
-        if (i >= 10) {
-            correctSTR += `+${correctANS.length-10} users`
-            break
-        }
-    }
-
-    let incorrectSTR = "";
-    for (let i = 0; i < incorrectANS.length; i++) {
-        incorrectSTR += `<@${incorrectANS[i]}> `;
-
-        if (i >= 10) {
-            incorrectSTR += `+${incorrectANS.length-10} users`
-            break
-        }
-    }
-
-    if (correctANS.length > 0) {
-        await mess.channel.send({
-            content: correctSTR + "\nRight answer! / Правильно!",
-        });
-    }
-    if (incorrectANS.length > 0) {
-        await mess.channel.send({
-            content: incorrectSTR + "\nWrong answer! / Неправильно!",
-        });
-    }
-
-    return "";
 };
 
 const editQuestion = async (robot, mess, args) => {
-    if (
-        !mess.member.permissions.has(
-            Permissions.FLAGS.MANAGE_ROLES
-        )
-    ) {
-        await mess.channel.send({
-            content: "No permissions to use this command! / Недостаточно прав!",
-        });
-        return;
-    }
+    if (await permsCheck(mess, "MANAGE_ROLES")) return
     let res = {}
     await connectToDb().then(async mongoose => {
         try {
@@ -585,7 +255,7 @@ const editQuestion = async (robot, mess, args) => {
         }
     })
     let questions = res.questions;
-    let id = parseInt(args[1]);
+    let id = parseInt(await awaitMessages(mess, {content: "Write id of question / Напишите id вопроса"}))
     let question = {};
 
     for (let q of questions) {
@@ -596,7 +266,7 @@ const editQuestion = async (robot, mess, args) => {
     }
 
     if (isNaN(id) || Object.keys(question).length === 0) {
-        await mess.channel.send("Невалидный id вопроса! / Invalid id of question!");
+        await invalidQuestionID(mess)
         return;
     }
 
@@ -605,11 +275,31 @@ const editQuestion = async (robot, mess, args) => {
         answers += `${i + 1}. ${question.answers[i]}\n`;
     }
 
-    let param = "",
-        newValue = "";
-    await mess.channel.send({
+    let param = ""
+    param = await chooseOptionMenu(mess, [
+        {
+            label: "Question / Вопрос",
+            description: "Correct the question without rewriting the answers / Исправить вопрос без перезаписи ответов",
+            value: "question"
+        },
+        {
+            label: "Right answer / Правильный ответ",
+            description: "Change the right answer's number / Изменить номер правильного ответа",
+            value: "right_answer"
+        },
+        {
+            label: "Answers / Ответы",
+            description: "Rewriting all answers for the question / Перезапись всех ответов для вопроса",
+            value: "answers"
+        },
+        {
+            label: "Images / Изображения",
+            description: "Rewriting all images' links for the question / Перезапись всех ссылок на изображения для вопроса",
+            value: "images"
+        }
+    ], {
         embeds: [
-            createEmbed({
+            await createEmbed({
                 title:
                     "Что вы хотите изменить? Напишите название свойства на английском со строчной буквы или --END-- для прекращения процесса / What do you wanna change? Write a property name in lowercase or --END-- to stop the process",
                 author: `ID of question - ${question.questionID}`,
@@ -618,177 +308,128 @@ const editQuestion = async (robot, mess, args) => {
     Правильный ответ / Right answer - ${question.answer}`,
                 footer:
                     "Параметры, которые можно изменить / Parameters that can be changed - question, answers, right answer, images",
-            }),
+            }, mess.guild.id),
         ],
         files: question.images,
-    });
-    await mess.channel
-        .awaitMessages({
-            filter: () => mess.content,
-            max: 1,
-            time: 300000000,
-            errors: ["time"],
-        })
-        .then((collected) => {
-            param = collected.first().content;
-        })
-        .catch(() => {
-            param = "--END--";
-        });
+    })
 
     if (param === "--END--") {
-        await mess.channel.send("Операция остановлена / Operation terminated");
+        await operationTerminatedMsg(mess)
         return;
     }
 
     switch (param) {
         case "question":
-            await mess.channel.send("Напишите новый вопрос: / Write new question: ");
-            await mess.channel
-                .awaitMessages({
-                    filter: () => mess.content,
-                    time: 30000000,
-                    max: 1,
-                    errors: ["time"],
-                })
-                .then((collected) => {
-                    newValue = collected.first().content;
-                });
-            question.question = newValue;
+            question.question = await awaitMessages(mess, {content: "Напишите новый вопрос: / Write new question: "})
             break;
-        case "right answer":
-            await mess.channel.send(
-                "Напишите номер правильного ответа: / Write right answer number: "
-            );
-            await mess.channel
-                .awaitMessages({
-                    filter: () => mess.content,
-                    time: 30000000,
-                    max: 1,
-                    errors: ["time"],
-                })
-                .then((collected) => {
-                    newValue = collected.first().content;
-                });
-            question.answer = parseInt(newValue);
+        case "right_answer":
+            question.answer = parseInt(await awaitMessages(mess, {content: "Напишите номер правильного ответа: / Write right answer number: "}));
             break;
         case "answers":
-            let countOfAnswers = 0,
+            let countOfAnswers = await awaitMessages(mess, {
+                    content: "Please write count of answers. / Пожалуйста напишите количество ответов для вопроса",
+                }),
                 answers = [];
-            await mess.channel.send({
-                content:
-                    "Please write count of answers. / Пожалуйста напишите количество ответов для вопроса",
-            });
-            await mess.channel
-                .awaitMessages({
-                    filter: () => mess.content,
-                    max: 1,
-                    time: 300000000,
-                    errors: ["time"],
-                })
-                .then((collected) => {
-                    countOfAnswers = collected.first().content;
-                });
 
             for (let i = 0; i < countOfAnswers; i++) {
-                await mess.channel.send({
+                answers.push(await awaitMessages(mess, {
                     content: `Please write ${
                         i === 0 ? "first" : "next"
                     } answer for question /
           Пожалуйста напишите ${
                         i === 0 ? "первый" : "следующий"
                     } ответ для вопроса`,
-                });
-                await mess.channel
-                    .awaitMessages({
-                        filter: () => mess.content,
-                        max: 1,
-                        time: 300000000,
-                        errors: ["time"],
-                    })
-                    .then((collected) => {
-                        answers.push(collected.first().content);
-                    });
+                }))
             }
             question.answers = answers;
-
-            await mess.channel.send(
-                "Напишите номер правильного ответа: / Write right answer number: "
-            );
-            await mess.channel
-                .awaitMessages({
-                    filter: () => mess.content,
-                    time: 30000000,
-                    max: 1,
-                    errors: ["time"],
-                })
-                .then((collected) => {
-                    newValue = collected.first().content;
-                });
-            question.answer = parseInt(newValue);
+            question.answer = parseInt(await awaitMessages(mess, {content: "Напишите номер правильного ответа: / Write right answer number: "}));
             break;
         case "images":
-            let countOfImages = 0,
-                images = [];
-            await mess.channel.send({
-                content:
-                    "Please write count of images for question. Write 0 if you don't want to attach images. Please note that all old pictures will be deleted / Пожалуйста напишите количество картинок для вопроса. Напишите 0, если не хотите прикреплять картинки. Учитывайте, что все старые картинки будут удалены",
-            });
-            await mess.channel
-                .awaitMessages({
-                    filter: () => mess.content,
-                    max: 1,
-                    time: 300000000,
-                    errors: ["time"],
-                })
-                .then((collected) => {
-                    countOfImages = collected.first().content;
-                });
+            let images = [];
+            let countOfImages = await chooseOptionMenu(mess, [
+                {
+                    label: 'No images',
+                    description: '',
+                    value: 'zero',
+                },
+                {
+                    label: '1',
+                    description: '',
+                    value: 'one',
+                },
+                {
+                    label: '2',
+                    description: '',
+                    value: 'two',
+                },
+                {
+                    label: '3',
+                    description: '',
+                    value: 'three',
+                },
+                {
+                    label: '4',
+                    description: '',
+                    value: 'four',
+                },
+                {
+                    label: '5',
+                    description: '',
+                    value: 'five',
+                }
+            ], "Please choose count of images for question. / Пожалуйста выберите количество картинок для вопроса. ")[0]
+
+            switch (countOfImages) {
+                case "zero":
+                    countOfImages = 0;
+                    break
+                case "one":
+                    countOfImages = 1;
+                    break
+                case "two":
+                    countOfImages = 2;
+                    break
+                case "three":
+                    countOfImages = 3;
+                    break
+                case "four":
+                    countOfImages = 4;
+                    break
+                case "five":
+                    countOfImages = 5;
+                    break
+                default:
+            }
 
             for (let i = 0; i < countOfImages; i++) {
-                await mess.channel.send({
+                let image = await awaitMessages({
                     content: `Please write ${
                         i === 0 ? "first" : "next"
-                    } link with image. /
-        Пожалуйста напишите ${
+                    } link with image. Image must be uploaded to discord as message earlier. /
+      Пожалуйста напишите ${
                         i === 0 ? "первую" : "следующую"
-                    } ссылку с картинкой.`,
-                });
-                await mess.channel
-                    .awaitMessages({
-                        filter: () => mess.content,
-                        max: 1,
-                        time: 300000000,
-                        errors: ["time"],
-                    })
-                    .then((collected) => {
-                        images.push(collected.first().content);
-                    });
+                    } ссылку с картинкой. Картинка должна быть загружена в виде сообщения в discord ранее.`,
+                })
+                if (
+                    image.indexOf("https://media.discordapp.net/attachments/") === -1 ||
+                    image.length < 42
+                ) {
+                    await mess.channel.send(
+                        {content: "Invalid URL to picture. / Невалидная ссылка на картинку"}
+                    );
+                    countOfImages++;
+                } else {
+                    images.push(image.split("?")[0]);
+                }
             }
             question.images = images;
             break;
         default:
-            await mess.channel.send("Invalid param / Невалидный параметр");
+            await mess.channel.send({content: "Invalid param / Невалидный параметр"});
             return;
     }
 
-    let isEdit = false;
-    await mess.channel.send({
-        content:
-            "Вы уверены, что хотите изменить вопрос? Это действие будет невозможно отменить. Напишите 1, если да. / Do you really wanna update the question? You cannot undo it. Write 1 if yes",
-    });
-    await mess.channel
-        .awaitMessages({
-            filter: () => mess.content,
-            max: 1,
-            time: 300000000,
-            errors: ["time"],
-        })
-        .then((collected) => {
-            if (parseInt(collected.first().content) === 1) {
-                isEdit = true;
-            }
-        });
+    let isEdit = await confirmActions(mess)
 
     if (isEdit) {
         for (let q of questions) {
@@ -804,23 +445,14 @@ const editQuestion = async (robot, mess, args) => {
                 await mongoose.endSession()
             }
         })
-        await mess.channel.send({content: "Успех! / Success!"});
+        await defaultSuccessMsg(mess)
     } else {
-        await mess.channel.send("Операция остановлена / Operation terminated");
+        await operationTerminatedMsg(mess)
     }
 };
 
 const showQuestion = async (robot, mess, args) => {
-    if (
-        !mess.member.permissions.has(
-            Permissions.FLAGS.MANAGE_ROLES
-        )
-    ) {
-        await mess.channel.send({
-            content: "No permissions to use this command! / Недостаточно прав!",
-        });
-        return;
-    }
+    if (await permsCheck(mess, "MANAGE_ROLES")) return
     let res = {}
     await connectToDb().then(async mongoose => {
         try {
@@ -830,7 +462,7 @@ const showQuestion = async (robot, mess, args) => {
         }
     })
     let questions = res.questions;
-    let id = args[1]
+    let id = await awaitMessages(mess, `Please write id of question (or "all" to see all) / Пожалуйста напишите id вопроса (или "all", чтобы просмотреть все)`)
     let question = {};
 
     if (id === "all") {
@@ -848,10 +480,10 @@ const showQuestion = async (robot, mess, args) => {
 
         await mess.channel.send({
             embeds: [
-                createEmbed({
+                await createEmbed({
                     title: "Questions / Вопросы",
                     description: str,
-                }),
+                }, mess.guild.id),
             ],
         });
 
@@ -872,7 +504,7 @@ const showQuestion = async (robot, mess, args) => {
     }
 
     if (isNaN(id) || Object.keys(question).length === 0) {
-        await mess.channel.send("Невалидный id вопроса! / Invalid id of question!");
+        await invalidQuestionID(mess)
         return;
     }
 
@@ -883,13 +515,13 @@ const showQuestion = async (robot, mess, args) => {
 
     await mess.channel.send({
         embeds: [
-            createEmbed({
+            await createEmbed({
                 title: "1",
                 author: `ID of question - ${question.questionID}`,
                 description: `Вопрос / Question - ${question.question}
     Ответы / Answers: \n\`\`\`${answers}\`\`\`
     Правильный ответ / Right answer - ${question.answer}`,
-            }),
+            }, mess.guild.id),
         ],
         files: question.images,
     });
@@ -898,8 +530,6 @@ const showQuestion = async (robot, mess, args) => {
 module.exports = {
     addQuestion,
     deleteQuestion,
-    getQuestion,
-    askQuestion,
     editQuestion,
     showQuestion
 };

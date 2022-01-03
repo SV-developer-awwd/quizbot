@@ -1,21 +1,17 @@
-const {Permissions, MessageAttachment} = require("discord.js");
-const connectToDb = require("../mongoconnect");
-const serverSchema = require("../schemas/server-schema");
+const {MessageAttachment} = require("discord.js");
 const fs = require("fs");
 const path = require("path");
-const {txtGenerator} = require("../communication/exportGenerators");
+const random = require('random')
 
-const exportAsTXT = async (robot, mess, args) => {
-    if (
-        !mess.member.permissions.has(
-            Permissions.FLAGS.MANAGE_ROLES
-        )
-    ) {
-        await mess.channel.send({
-            content: "No permissions to use this command! / Недостаточно прав!",
-        });
-        return;
-    }
+const connectToDb = require("../mongoconnect");
+const serverSchema = require("../schemas/server-schema");
+const {txtGenerator} = require("../communication/exportGenerators");
+const {permsCheck} = require("../communication/permsCheck");
+const {uncaughtError} = require("../communication/embeds/error-messages");
+const {getQIDs} = require("../communication/interactions/getQIDs");
+
+const exportAsTXT = async (robot, mess) => {
+    if (await permsCheck(mess, "MANAGE_ROLES")) return
 
     let res = {}
     await connectToDb().then(async mongoose => {
@@ -28,9 +24,7 @@ const exportAsTXT = async (robot, mess, args) => {
     let questions = res.questions;
     questions = questions.filter(q => q !== null)
 
-    let qIDs = args
-    qIDs.shift()
-    qIDs.pop()
+    const qIDs = await getQIDs(mess)
 
     if (qIDs.length < 1) {
         await mess.channel.send({content: "No questions to export! / Нет вопросов для экспорта!"})
@@ -40,16 +34,20 @@ const exportAsTXT = async (robot, mess, args) => {
     const string = txtGenerator(qIDs, questions)
 
     try {
-        await fs.writeFile(path.resolve(__dirname, "..", "storage", "questions.txt"), string, () => {
+        const requestID = random.int(100000, 999999)
+        await fs.writeFile(path.resolve(__dirname, "..", "storage", `questions-${requestID}.txt`), string, () => {
         })
 
-        const attachment = new MessageAttachment(path.resolve(__dirname, "..", "storage", "questions.txt"), 'questions.txt')
+        const attachment = new MessageAttachment(path.resolve(__dirname, "..", "storage", `questions-${requestID}.txt`), `questions-${requestID}.txt`)
         await mess.channel.send({
             content: "Success!",
             files: [attachment]
         })
+
+        await fs.unlink(path.resolve(__dirname, "..", "storage", `questions-${requestID}.txt`), () => {
+        })
     } catch (e) {
-        await mess.channel.send("Uncaught error! Please try again / Ошибка! Пожалуйста попробуйте снова")
+        await uncaughtError(mess)
     }
 }
 

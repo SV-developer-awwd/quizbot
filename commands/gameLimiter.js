@@ -1,36 +1,25 @@
-const {Permissions} = require("discord.js");
 const connectToDb = require("../mongoconnect");
 const serverSchema = require("../schemas/server-schema");
-const {createEmbed} = require("../communication/embeds");
+const {createEmbed} = require("../communication/embeds/embeds");
+const {permsCheck} = require("../communication/permsCheck");
+const {uncaughtError, operationTerminatedMsg, invalidValueError} = require("../communication/embeds/error-messages");
+const {defaultSuccessMsg} = require("../communication/embeds/success-messages");
+const {confirmActions} = require("../communication/interactions/actionsConfirmation");
+const {awaitMessages} = require("../communication/interactions/awaitMessages");
 
-const changeMaxGamesForUser = async (robot, mess, args) => {
-    if (!mess.member.permissions.has(Permissions.FLAGS.ADMINISTRATOR)) {
-        await mess.channel.send({
-            content: "No permissions to use this command! / Недостаточно прав!",
-        });
-        return;
+const changeMaxGamesForUser = async (robot, mess) => {
+    if (await permsCheck(mess, "ADMINISTRATOR")) return
+
+    let maxGames = parseInt(await awaitMessages(mess, {content: `Please write the maximum number of games per day (or "off" to disable game limiter) / Пожалуйста напишите максимальное количество игр в день (или "off", чтобы выключить ограничитель игр)`
+}))
+
+    if (maxGames < 1 || isNaN(maxGames)) {
+        maxGames = NaN
     }
 
-    let maxGames = parseInt(args[1]) <= 0 ? NaN : parseInt(args[1]);
-    let isChange = false,
+    let isChange = await confirmActions(mess, `Счетчик игр за сегодня будет сброшен в 0, количество максимальных запущенных игр за день будет изменено на ${maxGames.isNaN() ? "бесконечное" : maxGames}. Для подтверждения напишите 1. /
+    The game counter for today will be reset to 0, and the number of maximum games played for the day will be changed to ${maxGames.isNaN() ? "infinity" : maxGames}. To confirm, write 1.`),
         crash = false;
-
-    await mess.channel.send({
-        content: `Счетчик игр за сегодня будет сброшен в 0, количество максимальных запущенных игр за день будет изменено на ${maxGames.isNaN() ? "бесконечное" : maxGames}. Для подтверждения напишите 1. / 
-  The game counter for today will be reset to 0, and the number of maximum games played for the day will be changed to ${maxGames.isNaN() ? "infinity" : maxGames}. To confirm, write 1.`,
-    });
-    await mess.channel
-        .awaitMessages({
-            filter: () => mess.content,
-            time: 30000,
-            max: 1,
-            errors: [],
-        })
-        .then((collected) => {
-            if (parseInt(collected.first().content) === 1) {
-                isChange = true;
-            }
-        });
 
     if (isChange) {
         await connectToDb().then(async (mongoose) => {
@@ -42,57 +31,33 @@ const changeMaxGamesForUser = async (robot, mess, args) => {
                     {games: res.games}
                 );
             } catch (e) {
-                await mess.channel.send({
-                    embeds: [
-                        createEmbed({
-                            title: `Uncaught error. Please try again \n Ошибка! Пожалуйста попробуйте снова`,
-                        }),
-                    ],
-                });
+                await uncaughtError(mess)
                 crash = true;
             } finally {
                 await mongoose.endSession()
             }
         });
         if (crash) return;
-        await mess.channel.send(`Ограничитель игр ${isNaN(maxGames) ? "выключен" : `установлен на ${maxGames} игр`}! / Game limiter ${isNaN(maxGames) ? "off" : `set to ${maxGames} games`}!`)
+        await mess.channel.send({
+            embeds: [
+                await createEmbed({
+                    title: `Ограничитель игр ${isNaN(maxGames) ? "выключен" : `установлен на ${maxGames} игр`}! / Game limiter ${isNaN(maxGames) ? "off" : `set to ${maxGames} games`}!`
+                })
+            ]
+        })
         return;
     }
 
-    await mess.channel.send("Операция остановлена. / Operation terminated.");
+    await operationTerminatedMsg(mess)
 };
 
 const clearGamesList = async (robot, mess, args) => {
-    if (!mess.member.permissions.has(Permissions.FLAGS.ADMINISTRATOR)) {
-        await mess.channel.send({
-            content: "No permissions to use this command! / Недостаточно прав!",
-        });
-        return;
-    }
+    if (await permsCheck(mess, "ADMINISTRATOR")) return
 
     let clear = false
 
     if (args[1] === "all") {
-        await mess.channel.send({
-            content:
-                "Do you really wanna clear games list for today? You cannot undo it. Write TRUE if you really wanna do it / Вы реально хотите стереть весь список игр за сегодня? Это действие невозможно отменить. Напишите TRUE, если вы реально хотите это сделать",
-        });
-        await mess.channel
-            .awaitMessages({
-                filter: () => mess.content,
-                time: 30000,
-                max: 1,
-                errors: ["time"],
-            })
-            .then((collected) => {
-                if (
-                    collected.first().content === "TRUE" ||
-                    collected.first().content === "true" ||
-                    collected.first().content === "True"
-                ) {
-                    clear = true;
-                }
-            }).catch(() => clear = false)
+        clear = await confirmActions(mess)
 
         if (clear) {
             await connectToDb().then(async mongoose => {
@@ -104,13 +69,9 @@ const clearGamesList = async (robot, mess, args) => {
                     await mongoose.endSession()
                 }
             })
-            await mess.channel.send({
-                content: "Games list successfully cleared / Список игр успешно очищен",
-            });
+            await defaultSuccessMsg(mess)
         } else {
-            await mess.channel.send({
-                content: "Operation stopped / Операция остановлена",
-            });
+            await operationTerminatedMsg(mess)
         }
         return
     }
@@ -119,7 +80,7 @@ const clearGamesList = async (robot, mess, args) => {
     try {
         user = mess.mentions.users.first().id
     } catch (e) {
-        await mess.channel.send('Invalid value / Невалидное значение')
+        await invalidValueError(mess)
         return
     }
 
@@ -128,9 +89,10 @@ const clearGamesList = async (robot, mess, args) => {
             let res = await serverSchema.findOne({server: mess.guild.id})
             res.games[user] = 0
             await serverSchema.updateOne({server: mess.guild.id}, {games: res.games})
-            await mess.channel.send('Success')
+
+            await defaultSuccessMsg(mess)
         } catch (e) {
-            await mess.channel.send('Something went wrong... Try again please / Что-то пошло не так... Попробуйте пожалуйста еще раз')
+            await uncaughtError(mess)
         } finally {
             await mongoose.endSession()
         }
@@ -169,10 +131,10 @@ const showGames = async (robot, mess) => {
 
     await mess.channel.send({
         embeds: [
-            createEmbed({
-                title: "Server leaderboard / Таблица лидеров сервера",
+            await createEmbed({
+                title: "Games for the day / Игры за день",
                 description: gamesSTR,
-            }),
+            }, mess.guild.id),
         ],
     });
 };

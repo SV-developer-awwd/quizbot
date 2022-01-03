@@ -1,19 +1,11 @@
-const {Permissions} = require("discord.js");
 const connectToDb = require("../../mongoconnect");
 const serverSchema = require("../../schemas/server-schema");
-const {createEmbed} = require("../../communication/embeds");
+const {createEmbed} = require("../../communication/embeds/embeds");
+const {permsCheck} = require("../../communication/permsCheck");
+const {invalidQuestionID} = require("../../communication/embeds/error-messages");
 
 const slash_showQuestion = async (robot, interaction, options) => {
-    if (
-        !interaction.member.permissions.has(
-            Permissions.FLAGS.MANAGE_ROLES
-        )
-    ) {
-        await interaction.reply({
-            content: "No permissions to use this command! / Недостаточно прав!",
-        });
-        return;
-    }
+    if (await permsCheck(interaction, "MANAGE_ROLES")) return
     let res = {}
     await connectToDb().then(async mongoose => {
         try {
@@ -41,10 +33,10 @@ const slash_showQuestion = async (robot, interaction, options) => {
 
         await interaction.reply({
             embeds: [
-                createEmbed({
+                await createEmbed({
                     title: "Questions / Вопросы",
                     description: str,
-                }),
+                }, interaction.guild.id),
             ],
         });
 
@@ -65,7 +57,7 @@ const slash_showQuestion = async (robot, interaction, options) => {
     }
 
     if (isNaN(id) || Object.keys(question).length === 0) {
-        await interaction.reply("Невалидный id вопроса! / Invalid id of question!");
+        await invalidQuestionID(interaction, true)
         return;
     }
 
@@ -76,13 +68,13 @@ const slash_showQuestion = async (robot, interaction, options) => {
 
     await interaction.reply({
         embeds: [
-            createEmbed({
+            await createEmbed({
                 title: "1",
                 author: `ID of question - ${question.questionID}`,
                 description: `Вопрос / Question - ${question.question}
     Ответы / Answers: \n\`\`\`${answers}\`\`\`
     Правильный ответ / Right answer - ${question.answer}`,
-            }),
+            }, interaction.guild.id),
         ],
         files: question.images,
     });

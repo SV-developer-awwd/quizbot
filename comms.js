@@ -10,10 +10,13 @@ const {
 } = require('./commands/questions')
 
 // GAME //
-const {game} = require('./commands/game');
+const {game} = require('./commands/quizzes/game');
 
 // SETTINGS //
-const {setQuestionTimeout, setShowRightAns, setGameStartPerms, setPrefix} = require("./commands/settings");
+const {
+    showSettings,
+    resetSettings, updateSettings
+} = require("./commands/settings");
 
 // HELP //
 const {botinfo, help, commandHelp} = require("./commands/help");
@@ -29,7 +32,7 @@ const {exportAsTXT} = require('./commands/exports')
 
 let comms_list = [
     {
-        name: "rewriterules",
+        name: "rewrite",
         out: rewriteRules,
         about: "",
     },
@@ -51,11 +54,6 @@ let comms_list = [
     {
         name: "game",
         out: game,
-        about: ""
-    },
-    {
-        name: "settimeout",
-        out: setQuestionTimeout,
         about: ""
     },
     {
@@ -81,11 +79,6 @@ let comms_list = [
     {
         name: "command",
         out: commandHelp,
-        about: ""
-    },
-    {
-        name: "enableRightAnswer",
-        out: setShowRightAns,
         about: ""
     },
     {
@@ -119,18 +112,23 @@ let comms_list = [
         about: ""
     },
     {
-        name: "setgamestartperms",
-        out: setGameStartPerms,
-        about: ""
-    },
-    {
-        name: "exportastxt",
+        name: "export",
         out: exportAsTXT,
         about: ""
     },
     {
-        name: "prefix",
-        out: setPrefix,
+        name: "settings",
+        out: showSettings,
+        about: ""
+    },
+    {
+        name: "reset",
+        out: resetSettings,
+        about: ""
+    },
+    {
+        name: "update",
+        out: updateSettings,
         about: ""
     }
 ];

@@ -1,15 +1,12 @@
-const {Permissions} = require("discord.js");
 const connectToDb = require("../../mongoconnect");
 const serverSchema = require("../../schemas/server-schema");
-const {createEmbed} = require("../../communication/embeds");
+const {createEmbed} = require("../../communication/embeds/embeds");
+const {permsCheck} = require("../../communication/permsCheck");
+const {uncaughtError} = require("../../communication/embeds/error-messages");
+const {defaultSuccessMsg} = require("../../communication/embeds/success-messages");
 
 const slash_changeMaxGamesForUser = async (robot, interaction, options) => {
-    if (!interaction.member.permissions.has(Permissions.FLAGS.ADMINISTRATOR)) {
-        await interaction.reply({
-            content: "No permissions to use this command! / Недостаточно прав!",
-        });
-        return;
-    }
+    if (await permsCheck(interaction, "ADMINISTRATOR")) return
 
     let maxGames = options.getNumber('count') <= 0 ? NaN : parseInt(options.getNumber('count'));
     let crash = false;
@@ -41,13 +38,7 @@ const slash_changeMaxGamesForUser = async (robot, interaction, options) => {
                 {games: res.games}
             );
         } catch (e) {
-            await interaction.reply({
-                embeds: [
-                    createEmbed({
-                        title: `Uncaught error. Please try again \n Ошибка! Пожалуйста попробуйте снова`,
-                    }),
-                ],
-            });
+            await uncaughtError(interaction, true)
             crash = true;
         } finally {
             await mongoose.endSession()
@@ -59,12 +50,7 @@ const slash_changeMaxGamesForUser = async (robot, interaction, options) => {
 };
 
 const slash_clearGamesList = async (robot, interaction, options) => {
-    if (!interaction.member.permissions.has(Permissions.FLAGS.ADMINISTRATOR)) {
-        await interaction.reply({
-            content: "No permissions to use this command! / Недостаточно прав!",
-        });
-        return;
-    }
+    if (await permsCheck(interaction, "ADMINISTRATOR")) return
 
     let user = options.getUser('user').id
 
@@ -73,9 +59,10 @@ const slash_clearGamesList = async (robot, interaction, options) => {
             let res = await serverSchema.findOne({server: interaction.guild.id})
             res.games[user] = 0
             await serverSchema.updateOne({server: interaction.guild.id}, {games: res.games})
-            await interaction.reply('Success')
+
+            await defaultSuccessMsg(interaction, true)
         } catch (e) {
-            await interaction.reply('Something went wrong... Try again please / Что-то пошло не так... Попробуйте пожалуйста еще раз')
+            await uncaughtError(interaction, true)
         } finally {
             await mongoose.endSession()
         }
@@ -114,10 +101,10 @@ const slash_showGames = async (robot, interaction) => {
 
     await interaction.reply({
         embeds: [
-            createEmbed({
-                title: "Server leaderboard / Таблица лидеров сервера",
+            await createEmbed({
+                title: "Games for the day / Игры за день",
                 description: gamesSTR,
-            }),
+            }, interaction.guild.id),
         ],
     });
 };

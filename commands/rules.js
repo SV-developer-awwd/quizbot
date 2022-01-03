@@ -1,24 +1,18 @@
 const connectToDb = require("../mongoconnect");
 const serverSchema = require("../schemas/server-schema");
-const {createEmbed} = require("../communication/embeds");
-const {Permissions} = require("discord.js");
-const {getRules} = require("../communication/getRules");
+const {createEmbed} = require("../communication/embeds/embeds");
+const {getRules} = require("../communication/getters");
+const {permsCheck} = require("../communication/permsCheck");
+const {tooLongRulesError, uncaughtError} = require("../communication/embeds/error-messages");
+const {defaultSuccessMsg} = require("../communication/embeds/success-messages");
+const {awaitMessages} = require("../communication/interactions/awaitMessages");
 
 const rewriteRules = async (robot, mess, args) => {
-    if (
-        !mess.member.permissions.has(
-            Permissions.FLAGS.MANAGE_ROLES
-        )
-    ) {
-        await mess.channel.send({
-            content: "No permissions to use this command! / Недостаточно прав!",
-        });
-        return;
-    }
+    if (await permsCheck(mess, "MANAGE_ROLES")) return
 
-    const newRules = args.splice(1).join(' ')
-    if(newRules.length > 1950) {
-        mess.channel.send('Too long rules. / Слишком длинные правила')
+    const newRules = await awaitMessages(mess, {content: "Please write the new rules (max 1999 symbols including spaces and punctuation marks) / Пожалуйста напишите новые правила (максимум 1999 символов, включая пробелы и знаки препинания)"})
+    if (newRules.length > 1999) {
+        await tooLongRulesError(mess)
         return
     }
 
@@ -33,18 +27,10 @@ const rewriteRules = async (robot, mess, args) => {
                 await mongoose.endSession()
             }
         });
-        await mess.channel.send({
-            embeds: [
-                createEmbed({
-                    title: `Rules successfully updated.\n Правила успешно обновлены.`,
-                }),
-            ],
-        });
+
+        await defaultSuccessMsg(mess)
     } catch (e) {
-        await mess.channel.send({
-            content: `Uncaught Error, try again please.
-    Ошибка! Попробуйте еще раз.`,
-        });
+        await uncaughtError(mess)
     }
 };
 
@@ -54,39 +40,37 @@ const showRules = async (robot, mess) => {
         try {
             res = await serverSchema.findOne({server: mess.guild.id});
         } finally {
-           await mongoose.endSession()
+            await mongoose.endSession()
         }
     });
     const rules = res.rules;
 
     await mess.channel.send({
         embeds: [
-            createEmbed({
+            await createEmbed({
                 title: "Правила игры: ",
                 description: rules,
-            }),
+            }, mess.guild.id),
         ],
     });
 };
 
 const addRules = async (robot, mess, args) => {
-    if (
-        !mess.member.permissions.has(
-            Permissions.FLAGS.MANAGE_ROLES
-        )
-    ) {
-        await mess.channel.send({
-            content: "No permissions to use this command! / Недостаточно прав!",
-        });
-        return;
-    }
+    if (await permsCheck(mess, "MANAGE_ROLES")) return
 
     let rules = await getRules(mess.guild.id);
-    const newRule = args.splice(1).join(" ");
+    if (rules.length > 1950) {
+        await tooLongRulesError(mess)
+        return
+    }
+
+    const newRule = await awaitMessages(mess, {
+        content: `Please write new rule (${1999 - rules.length} symbols max) / Пожалуйста наишите новые правила (${1999 - rules.length} symbols max)`
+    })
     rules += `\n${newRule}`;
 
-    if(rules.length > 1950) {
-        mess.channel.send(`Updated rules will be too long so I can't update them. / Обновленные правила будут слишком длинными. Я не могу обновить их.`)
+    if (rules.length > 1999) {
+        await tooLongRulesError(mess)
         return
     }
 
@@ -98,18 +82,10 @@ const addRules = async (robot, mess, args) => {
                 await mongoose.endSession()
             }
         });
-        await mess.channel.send({
-            embeds: [
-                createEmbed({
-                    title: `Rules successfully updated.\n Правила успешно обновлены.`,
-                }),
-            ],
-        });
+
+        await defaultSuccessMsg(mess)
     } catch (e) {
-        await mess.channel.send({
-            content: `Uncaught Error, try again please.
-    Ошибка! Попробуйте еще раз.`,
-        });
+        await uncaughtError(mess)
     }
 };
 

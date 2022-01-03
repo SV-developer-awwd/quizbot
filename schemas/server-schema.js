@@ -10,7 +10,10 @@ const serverSchema = mongoose.Schema({
     games: Object,
     questionIDs: Array,
     whoCanStartGame: String,
-    prefix: String
+    prefix: String,
+    embedColor: String,
+    threadsPlayerTimeout: Number,
+    confirmationTimeout: Number
 })
 
 module.exports = mongoose.model('server', serverSchema)

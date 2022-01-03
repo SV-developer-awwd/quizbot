@@ -1,8 +1,8 @@
 const connectToDb = require("../../mongoconnect");
 const serverSchema = require("../../schemas/server-schema");
-
-const {createEmbed} = require("../../communication/embeds");
-const {Permissions} = require("discord.js");
+const {createEmbed} = require("../../communication/embeds/embeds");
+const {permsCheck} = require("../../communication/permsCheck");
+const {defaultSuccessMsg} = require("../../communication/embeds/success-messages");
 
 const slash_showLB = async (robot, interaction) => {
     let res = {}
@@ -41,22 +41,17 @@ const slash_showLB = async (robot, interaction) => {
     for (let i = 0; i < pointsArr.length; i++) {
         await interaction.reply({
             embeds: [
-                createEmbed({
+                await createEmbed({
                     title: i === 0 ? "Server leaderboard / Таблица лидеров сервера" : `Страница #${i + 1} / Page #${i + 1}`,
                     description: pointsArr[i],
-                }),
+                }, interaction.guild.id),
             ],
         });
     }
 };
 
 const slash_clearLB = async (robot, interaction, options) => {
-    if (!interaction.member.permissions.has(Permissions.FLAGS.MANAGE_ROLES)) {
-        await interaction.reply({
-            content: "No permissions to use this command! / Недостаточно прав!",
-        });
-        return;
-    }
+    if (await permsCheck(interaction, "MANAGE_ROLES")) return
 
     let user = options.getUser('user')
 
@@ -69,9 +64,7 @@ const slash_clearLB = async (robot, interaction, options) => {
             await mongoose.endSession()
         }
     })
-    await interaction.reply({
-        content: "Information successfully cleared / Информация успешно удалена"
-    });
+    await defaultSuccessMsg(interaction, true)
 };
 
 module.exports = {slash_clearLB, slash_showLB}
