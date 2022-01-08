@@ -19,7 +19,7 @@ const botinfo = async (robot, mess) => {
         embeds: [
             await createEmbed({
                 title: "Information about the bot / Инфорамция о боте",
-                description: `**Developed by / Разработал** - @TS prog#5629
+                description: `**Developed by / Разработал** - @TS prog#3919
       **Prefix / Префикс** - ${prefix}
       **Help command / Команда справки** - ${prefix}help`
             }, mess.guild.id),

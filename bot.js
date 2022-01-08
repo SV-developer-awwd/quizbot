@@ -18,7 +18,7 @@ const dateSchema = require('./schemas/date-schema')
 const connectToDb = require('./mongoconnect')
 
 robot.on("ready", async function () {
-    console.log(robot.user.username + " запустился!")
+    console.log(robot.user.username + " successfully started!")
 
     let commands = robot.application.commands
     for (let i = 0; i < slash_comms_list.length; i++) {

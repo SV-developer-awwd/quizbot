@@ -7,6 +7,4 @@
 .env.local
 env settings.txt
 
-yarn.lock
-package-lock.json
 nodemon.json
