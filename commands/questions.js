@@ -11,7 +11,6 @@ const {
 } = require("../communication/embeds/error-messages");
 const {defaultSuccessMsg} = require("../communication/embeds/success-messages");
 const {awaitMessages} = require("../communication/interactions/awaitMessages");
-const {chooseOption} = require("../communication/interactions/chooseOptionButtons");
 const {chooseOptionMenu} = require("../communication/interactions/chooseOptionMenu");
 const {getQIDs} = require("../communication/interactions/getQIDs");
 const {confirmActions} = require("../communication/interactions/actionsConfirmation");
@@ -100,7 +99,9 @@ const addQuestion = async (robot, mess, args) => {
                 description: '',
                 value: 'five',
             }
-        ], "Please choose count of images for question. / Пожалуйста выберите количество картинок для вопроса. ")[0]
+        ], "Please choose count of images for question. / Пожалуйста выберите количество картинок для вопроса. ")
+
+        countOfImages = countOfImages[0]
 
         switch (countOfImages) {
             case "zero":
@@ -130,7 +131,7 @@ const addQuestion = async (robot, mess, args) => {
         }
 
         for (let i = 0; i < countOfImages; i++) {
-            let image = await awaitMessages({
+            let image = await awaitMessages(mess, {
                 content: `Please write ${
                     i === 0 ? "first" : "next"
                 } link with image. Image must be uploaded to discord as message earlier. /
@@ -377,7 +378,9 @@ const editQuestion = async (robot, mess, args) => {
                     description: '',
                     value: 'five',
                 }
-            ], "Please choose count of images for question. / Пожалуйста выберите количество картинок для вопроса. ")[0]
+            ], "Please choose count of images for question. / Пожалуйста выберите количество картинок для вопроса. ")
+
+            countOfImages = countOfImages[0]
 
             switch (countOfImages) {
                 case "zero":
@@ -402,7 +405,7 @@ const editQuestion = async (robot, mess, args) => {
             }
 
             for (let i = 0; i < countOfImages; i++) {
-                let image = await awaitMessages({
+                let image = await awaitMessages(mess, {
                     content: `Please write ${
                         i === 0 ? "first" : "next"
                     } link with image. Image must be uploaded to discord as message earlier. /

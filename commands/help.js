@@ -351,7 +351,7 @@ const commandHelp = async (robot, mess, args) => {
                         description: `**Syntax / Синтаксис** - "${prefix}settings"
           **Appointment / Назначение** - show current bot settings / показ текущих настроек бота
           **Minimal permissions / Минимальные права** - MANAGE_ROLES`
-                    })
+                    }, mess.guild.id)
                 ]
             })
             break
@@ -375,7 +375,7 @@ const commandHelp = async (robot, mess, args) => {
                         description: `**Syntax / Синтаксис** - "${prefix}update"
           **Appointment / Назначение** - updates bot settings / обновляет правила сервера
           **Minimal permissions / Минимальные права** - MANAGE_ROLES`
-                    })
+                    }, mess.guild.id)
                 ]
             })
             break

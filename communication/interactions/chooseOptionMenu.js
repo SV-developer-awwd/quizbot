@@ -18,7 +18,7 @@ const chooseOptionMenu = async (mess, options, sendMsg, min = 1, max = 1) => {
             await mongoose.endSession()
         }
     })
-    const confirmationTime = res.confirmationTimeout
+    const confirmationTime = res.confirmationTimeout < 30 ? 30 : res.confirmationTimeout
 
     const row = new MessageActionRow()
         .addComponents(

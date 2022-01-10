@@ -1,7 +1,7 @@
-require('dotenv').config()
-// require('dotenv').config({
-//     path: __dirname + "/.env.local"
-// })
+//require('dotenv').config()
+require('dotenv').config({
+    path: __dirname + "/.env.local"
+})
 
 const Discord = require('discord.js');
 const intents = Discord.Intents.FLAGS
@@ -99,7 +99,7 @@ const {defaultSettings} = require("./defaultSettings");
 const PORT = process.env.PORT
 const app = express()
 
-const getMethod = app.get("/", (req, res) => {
+app.get("/", (req, res) => {
     res.status(200).send("Discord bot - Quiz bot")
 })
 
@@ -108,5 +108,5 @@ app.listen(PORT, () => {
 })
 
 setInterval(() => {
-    getMethod()
+    console.log(Math.random() + Math.random())
 }, 1500000)

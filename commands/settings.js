@@ -4,7 +4,7 @@ const connectToDb = require("../mongoconnect");
 const serverSchema = require("../schemas/server-schema");
 const {createEmbed} = require("../communication/embeds/embeds");
 const {permsCheck} = require("../communication/permsCheck");
-const {uncaughtError, noPermissionsError} = require("../communication/embeds/error-messages");
+const {uncaughtError, noPermissionsError, operationTerminatedMsg} = require("../communication/embeds/error-messages");
 const {defaultSuccessMsg} = require("../communication/embeds/success-messages");
 const {confirmActions} = require("../communication/interactions/actionsConfirmation");
 const {defaultSettings} = require("../defaultSettings");
@@ -30,7 +30,7 @@ const showSettings = async (robot, mess) => {
             .addFields([
                 {
                     name: "**Time to wait for an answer to a question / Время ожидания ответа на вопрос**",
-                    value: String(res.questionTimeout),
+                    value: String(res.questionTimeout / 1000) + "s",
                     inline: true
                 },
                 {
@@ -60,12 +60,12 @@ const showSettings = async (robot, mess) => {
                 },
                 {
                     name: `**Players waiting time (only in branch mode) / Время ожидания игроков (только в режиме веток)**`,
-                    value: String(res.threadsPlayersTimeout),
+                    value: String(res.threadsPlayersTimeout / 1000) + "s",
                     inline: true
                 },
                 {
                     name: `Waiting time for confirmation of actions / Время ожидания подтверждения действий`,
-                    value: String(res.confirmationTimeout),
+                    value: String(res.confirmationTimeout / 1000) + "s",
                     inline: true
                 }
             ])]
@@ -75,8 +75,8 @@ const showSettings = async (robot, mess) => {
 const resetSettings = async (robot, mess) => {
     if (await permsCheck(mess, "ADMINISTRATOR")) return
 
-    let isReset = await confirmActions(mess,
-        {content: "Resetting the settings, please wait / Сбрасываем настройки, пожалуйста подождите"})
+    let isReset = await confirmActions(mess,'Please confirm your actions / Пожалуйста подтвердите свои действия',
+        "Resetting the settings, please wait / Сбрасываем настройки, пожалуйста подождите")
 
     if (!isReset) {
         return
@@ -111,11 +111,6 @@ const updateSettings = async (robot, mess, args) => {
         ]
     })
     param = parseInt(param)
-
-    if (param < 1 || isNaN(param)) {
-        await mess.channel.send({content: "Invalid param / Невалидный параметр"})
-        return
-    }
 
     let data = {}
     switch (param) {
@@ -168,6 +163,10 @@ const updateSettings = async (robot, mess, args) => {
             break;
         case 4:
             let qTimeout = parseInt(await awaitMessages(mess, {content: "Write the new timeout (in seconds) / Напишите новое время ожидания (в секундах)"}));
+
+            qTimeout = qTimeout < 15 ? 15 : qTimeout
+            qTimeout = qTimeout > 300 ? 300 : qTimeout
+
             qTimeout *= 1000;
 
             if (isNaN(qTimeout)) {
@@ -181,7 +180,11 @@ const updateSettings = async (robot, mess, args) => {
             break;
         case 5:
             let mTimeout = parseInt(await awaitMessages(mess, {content: "Write the new timeout (in seconds) / Напишите новое время ожидания (в секундах)"}));
-            mTimeout *= 1000;
+
+            mTimeout = mTimeout < 30 ? 30 : mTimeout
+            mTimeout = mTimeout > 7200 ? 7200 : mTimeout
+
+            mTimeout *= 1000
 
             if (isNaN(mTimeout)) {
                 await mess.channel.send(
@@ -194,7 +197,9 @@ const updateSettings = async (robot, mess, args) => {
             break;
         case 6:
             let cTimeout = parseInt(await awaitMessages(mess, {content: "Write the new timeout (in seconds) / Напишите новое время ожидания (в секундах)"}));
-            cTimeout *= 1000;
+
+            cTimeout = cTimeout < 10 ? 10 : cTimeout
+            cTimeout = cTimeout > 60 ? 60 : cTimeout
 
             if (isNaN(cTimeout)) {
                 await mess.channel.send(
@@ -216,6 +221,8 @@ const updateSettings = async (robot, mess, args) => {
 
             data.embedColor = color
             break;
+        case 0:
+            await operationTerminatedMsg(mess)
         default:
             await mess.channel.send({content: "Invalid param / Невалидный параметр"})
     }

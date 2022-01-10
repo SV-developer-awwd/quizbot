@@ -12,7 +12,7 @@ const serverSchema = mongoose.Schema({
     whoCanStartGame: String,
     prefix: String,
     embedColor: String,
-    threadsPlayerTimeout: Number,
+    threadsPlayersTimeout: Number,
     confirmationTimeout: Number
 })
 

@@ -21,11 +21,11 @@ const createEmbed = async (args, serverID) => {
     return new Discord.MessageEmbed()
         .setColor(color)
         .setTitle(args.title)
-        .setAuthor(args.author ?? "")
+        .setAuthor({name: args.author ?? ""})
         .setDescription(args.description ?? "")
         .setThumbnail(args.thumbnail ?? "")
         .setImage(args.images ?? "")
-        .setFooter(args.footer ?? "");
+        .setFooter({text: args.footer ?? ""});
 };
 
 module.exports = {createEmbed}
