@@ -1,7 +1,7 @@
-// require('dotenv').config()
-require('dotenv').config({
-    path: __dirname + "/.env.local"
-})
+require('dotenv').config()
+// require('dotenv').config({
+//     path: __dirname + "/.env.local"
+// })
 
 const Discord = require('discord.js');
 const intents = Discord.Intents.FLAGS
@@ -114,4 +114,4 @@ app.listen(PORT, () => {
 
 setInterval(() => {
     console.log(Math.random() + Math.random())
-}, 1500000) //1500000
+}, 1500000)
