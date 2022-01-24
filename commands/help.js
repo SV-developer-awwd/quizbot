@@ -14,12 +14,13 @@ const botinfo = async (robot, mess) => {
     })
 
     const prefix = res.prefix ?? "q!"
+    const developer = await robot.users.fetch("749999134919884890")
 
     await mess.channel.send({
         embeds: [
             await createEmbed({
                 title: "Information about the bot / Инфорамция о боте",
-                description: `**Developed by / Разработал** - @TS prog#3919
+                description: `**Developed by / Разработал** - <@749999134919884890> (@${developer.username}#${developer.discriminator})
       **Prefix / Префикс** - ${prefix}
       **Help command / Команда справки** - ${prefix}help`
             }, mess.guild.id),

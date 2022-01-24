@@ -92,9 +92,7 @@ const clearLB = async (robot, mess, args) => {
 
     if (await permsCheck(mess, "ADMINISTRATOR")) return
 
-    let clear = false
-
-    clear = await confirmActions(mess)
+    let clear = await confirmActions(mess)
 
     if (clear) {
         await connectToDb().then(async mongoose => {

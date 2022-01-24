@@ -29,44 +29,44 @@ const showSettings = async (robot, mess) => {
             .setTitle("Current bot settings / Текущие настройки бота")
             .addFields([
                 {
-                    name: "**Time to wait for an answer to a question / Время ожидания ответа на вопрос**",
-                    value: String(res.questionTimeout / 1000) + "s",
-                    inline: true
+                    name: "Time to wait for an answer to a question / Время ожидания ответа на вопрос",
+                    value: `_${res.questionTimeout / 1000}s_`,
+                    inline: false
                 },
                 {
-                    name: "**Prefix / Префикс**",
-                    value: String(res.prefix),
-                    inline: true
+                    name: "Prefix / Префикс",
+                    value: `_${res.prefix}_`,
+                    inline: false
                 },
                 {
-                    name: "**Game start perms / Права на старт игры**",
-                    value: String(res.whoCanStartGame),
-                    inline: true
+                    name: "Game start perms / Права на старт игры",
+                    value: `_${res.whoCanStartGame}_`,
+                    inline: false
                 },
                 {
-                    name: "**Showing right answer (if nobody answered right) / Показ правильного ответа (если никто правильно не ответил)**",
-                    value: String(res.showRightAnswer),
-                    inline: true
+                    name: "Showing right answer (if nobody answered right) / Показ правильного ответа (если никто правильно не ответил)",
+                    value: `_${res.showRightAnswer}_`,
+                    inline: false
                 },
                 {
                     name: "Game limiter / Ограничитель игр",
-                    value: isNaN(res.games.max) ? "turned off / выключен" : `max ${res.games.max} games`,
-                    inline: true
+                    value: isNaN(res.games.max) ? "_turned off / выключен_" : `_max ${res.games.max} games_`,
+                    inline: false
                 },
                 {
                     name: "Message stroke color / Цвет боковины сообщений",
-                    value: String(res.embedColor),
-                    inline: true
+                    value: `_${res.embedColor}_`,
+                    inline: false
                 },
                 {
-                    name: `**Players waiting time (only in branch mode) / Время ожидания игроков (только в режиме веток)**`,
-                    value: String(res.threadsPlayersTimeout / 1000) + "s",
-                    inline: true
+                    name: `Players waiting time (only in branch mode) / Время ожидания игроков (только в режиме веток)`,
+                    value: `_${res.threadsPlayersTimeout / 1000}s_`,
+                    inline: false
                 },
                 {
                     name: `Waiting time for confirmation of actions / Время ожидания подтверждения действий`,
-                    value: String(res.confirmationTimeout / 1000) + "s",
-                    inline: true
+                    value: `_${res.confirmationTimeout / 1000}s_`,
+                    inline: false
                 }
             ])]
     })
@@ -91,7 +91,7 @@ const resetSettings = async (robot, mess) => {
     }
 }
 
-const updateSettings = async (robot, mess, args) => {
+const updateSettings = async (robot, mess) => {
     if (await permsCheck(mess, "MANAGE_ROLES")) return
 
     let param = await awaitMessages(mess, {
@@ -223,6 +223,7 @@ const updateSettings = async (robot, mess, args) => {
             break;
         case 0:
             await operationTerminatedMsg(mess)
+            break
         default:
             await mess.channel.send({content: "Invalid param / Невалидный параметр"})
     }

@@ -7,10 +7,15 @@ const {tooLongRulesError, uncaughtError} = require("../communication/embeds/erro
 const {defaultSuccessMsg} = require("../communication/embeds/success-messages");
 const {awaitMessages} = require("../communication/interactions/awaitMessages");
 
-const rewriteRules = async (robot, mess, args) => {
+const rewriteRules = async (robot, mess) => {
     if (await permsCheck(mess, "MANAGE_ROLES")) return
 
-    const newRules = await awaitMessages(mess, {content: "Please write the new rules (max 1999 symbols including spaces and punctuation marks) / Пожалуйста напишите новые правила (максимум 1999 символов, включая пробелы и знаки препинания)"})
+    const newRules = await awaitMessages(mess, {
+        embeds: [await createEmbed({
+            title: "Please write new rules below / Пожалуйста напишите новые правила ниже",
+            footer: `1999 symbols max`
+        }, mess.guild.id)]
+    })
     if (newRules.length > 1999) {
         await tooLongRulesError(mess)
         return
@@ -55,7 +60,7 @@ const showRules = async (robot, mess) => {
     });
 };
 
-const addRules = async (robot, mess, args) => {
+const addRules = async (robot, mess) => {
     if (await permsCheck(mess, "MANAGE_ROLES")) return
 
     let rules = await getRules(mess.guild.id);
@@ -65,7 +70,10 @@ const addRules = async (robot, mess, args) => {
     }
 
     const newRule = await awaitMessages(mess, {
-        content: `Please write new rule (${1999 - rules.length} symbols max) / Пожалуйста наишите новые правила (${1999 - rules.length} symbols max)`
+        embeds: [await createEmbed({
+            title: "Please write new rule below / Пожалуйста напишите новое правило ниже",
+            footer: `${1999 - rules.length} symbols max`
+        }, mess.guild.id)]
     })
     rules += `\n${newRule}`;
 

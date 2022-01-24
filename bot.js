@@ -1,7 +1,7 @@
-require('dotenv').config()
-// require('dotenv').config({
-//     path: __dirname + "/.env.local"
-// })
+// require('dotenv').config()
+require('dotenv').config({
+    path: __dirname + "/.env.local"
+})
 
 const Discord = require('discord.js');
 const intents = Discord.Intents.FLAGS
@@ -12,9 +12,9 @@ const {slash_comms_list, replySlash} = require("./slash-comms");
 
 let token = process.env.token;
 let prefix = process.env.prefix;
+const {defaultSettings} = require("./defaultSettings");
 
 const serverSchema = require('./schemas/server-schema')
-const dateSchema = require('./schemas/date-schema')
 const connectToDb = require('./mongoconnect')
 
 robot.on("ready", async function () {
@@ -82,7 +82,6 @@ robot.on('interactionCreate', async (interaction) => {
 setInterval(async () => {
     await connectToDb().then(async mongoose => {
         try {
-            await dateSchema.updateOne({type: "general"}, {date: Date.now()})
             await serverSchema.updateMany({}, {games: {}})
         } finally {
             await mongoose.endSession()
@@ -95,13 +94,19 @@ robot.login(token)
 
 //------------------------- EXPRESS SERVER FOR HEROKU -----------------------------------//
 const express = require('express')
-const {defaultSettings} = require("./defaultSettings");
 const PORT = process.env.PORT
 const app = express()
 
-app.get("/", (req, res) => {
-    res.status(200).send("Discord bot - Quiz bot")
-})
+let getMethod = undefined
+
+try {
+    getMethod = app.get("/", (req, res) => {
+        res.status(200).send("Discord bot - Quiz bot")
+    })
+} catch (e) {
+} finally {
+    console.log("REQ")
+}
 
 app.listen(PORT, () => {
     console.log(`Express has started successfully at ${PORT}`)
@@ -109,4 +114,4 @@ app.listen(PORT, () => {
 
 setInterval(() => {
     console.log(Math.random() + Math.random())
-}, 1500000)
+}, 1500000) //1500000

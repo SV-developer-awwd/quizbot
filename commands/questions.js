@@ -7,7 +7,7 @@ const {
     noResponseError,
     uncaughtError,
     invalidQuestionID,
-    operationTerminatedMsg
+    operationTerminatedMsg, invalidValueError
 } = require("../communication/embeds/error-messages");
 const {defaultSuccessMsg} = require("../communication/embeds/success-messages");
 const {awaitMessages} = require("../communication/interactions/awaitMessages");
@@ -33,15 +33,20 @@ const addQuestion = async (robot, mess, args) => {
         let newQuestionID = randomizer.int(10000, 99999)
 
         let newQuestion = await awaitMessages(mess, {content: "Please write a question / Пожалуйста напишите вопрос"}),
-            countOfAnswers = await awaitMessages(mess, {content: "Please write count of answers. / Пожалуйста напишите количество ответов для вопроса"}),
+            countOfAnswers = parseInt(await awaitMessages(mess, {content: "Please write count of answers. / Пожалуйста напишите количество ответов для вопроса"})),
             answers = [],
             rightAnswer = 0,
             countOfImages = 0,
             images = []
 
-        if (!newQuestion || !countOfAnswers) {
+        if (!newQuestion) {
             await noResponseError(mess)
             return;
+        }
+
+        if (isNaN(countOfAnswers)) {
+            await invalidValueError(mess)
+            return
         }
 
         for (let i = 0; i < countOfAnswers; i++) {
@@ -56,6 +61,8 @@ const addQuestion = async (robot, mess, args) => {
                 await noResponseError(mess)
                 return;
             }
+
+            answers.push(ans)
         }
 
         rightAnswer = await awaitMessages(mess, {
@@ -125,7 +132,7 @@ const addQuestion = async (robot, mess, args) => {
             default:
         }
 
-        if (!countOfImages) {
+        if (typeof countOfImages !== "number") {
             await noResponseError(mess)
             return
         }
@@ -145,8 +152,7 @@ const addQuestion = async (robot, mess, args) => {
             ) {
                 await mess.channel.send(
                     {content: "Invalid URL to picture. / Невалидная ссылка на картинку"}
-                );
-                countOfImages++;
+                )
             } else {
                 images.push(image.split("?")[0]);
             }
@@ -158,7 +164,7 @@ const addQuestion = async (robot, mess, args) => {
             answer: rightAnswer,
             answers,
             images,
-        };
+        }
 
         questions.push(newQ);
 
@@ -186,7 +192,7 @@ const addQuestion = async (robot, mess, args) => {
     }
 };
 
-const deleteQuestion = async (robot, mess, args) => {
+const deleteQuestion = async (robot, mess) => {
     if (await permsCheck(mess, "MANAGE_ROLES")) return
     let res = {}
     await connectToDb().then(async mongoose => {
@@ -245,7 +251,7 @@ const deleteQuestion = async (robot, mess, args) => {
     }
 };
 
-const editQuestion = async (robot, mess, args) => {
+const editQuestion = async (robot, mess) => {
     if (await permsCheck(mess, "MANAGE_ROLES")) return
     let res = {}
     await connectToDb().then(async mongoose => {
@@ -276,8 +282,7 @@ const editQuestion = async (robot, mess, args) => {
         answers += `${i + 1}. ${question.answers[i]}\n`;
     }
 
-    let param = ""
-    param = await chooseOptionMenu(mess, [
+    let param = await chooseOptionMenu(mess, [
         {
             label: "Question / Вопрос",
             description: "Correct the question without rewriting the answers / Исправить вопрос без перезаписи ответов",
@@ -331,6 +336,12 @@ const editQuestion = async (robot, mess, args) => {
                     content: "Please write count of answers. / Пожалуйста напишите количество ответов для вопроса",
                 }),
                 answers = [];
+
+            countOfAnswers = parseInt(countOfAnswers)
+            if (isNaN(countOfAnswers)) {
+                await invalidValueError(mess)
+                return
+            }
 
             for (let i = 0; i < countOfAnswers; i++) {
                 answers.push(await awaitMessages(mess, {
@@ -404,6 +415,11 @@ const editQuestion = async (robot, mess, args) => {
                 default:
             }
 
+            if (typeof countOfImages === "number") {
+                await noResponseError(mess)
+                return
+            }
+
             for (let i = 0; i < countOfImages; i++) {
                 let image = await awaitMessages(mess, {
                     content: `Please write ${
@@ -454,7 +470,7 @@ const editQuestion = async (robot, mess, args) => {
     }
 };
 
-const showQuestion = async (robot, mess, args) => {
+const showQuestion = async (robot, mess) => {
     if (await permsCheck(mess, "MANAGE_ROLES")) return
     let res = {}
     await connectToDb().then(async mongoose => {

@@ -16,7 +16,11 @@ const createEmbed = async (args, serverID) => {
         }
     })
 
-    const color = res.embedColor ?? "#0000ff"
+    let color = "#0000ff"
+    try {
+        color = res.embedColor ?? "#0000ff"
+    } catch (e) {
+    }
 
     return new Discord.MessageEmbed()
         .setColor(color)

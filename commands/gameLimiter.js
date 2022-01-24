@@ -17,8 +17,8 @@ const changeMaxGamesForUser = async (robot, mess) => {
         maxGames = NaN
     }
 
-    let isChange = await confirmActions(mess, `Счетчик игр за сегодня будет сброшен в 0, количество максимальных запущенных игр за день будет изменено на ${maxGames.isNaN() ? "бесконечное" : maxGames}. Для подтверждения напишите 1. /
-    The game counter for today will be reset to 0, and the number of maximum games played for the day will be changed to ${maxGames.isNaN() ? "infinity" : maxGames}. To confirm, write 1.`),
+    let isChange = await confirmActions(mess, `Счетчик игр за сегодня будет сброшен в 0, количество максимальных запущенных игр за день будет изменено на ${isNaN(maxGames) ? "бесконечное" : maxGames}. Для подтверждения напишите 1. /
+    The game counter for today will be reset to 0, and the number of maximum games played for the day will be changed to ${isNaN(maxGames) ? "infinity" : maxGames}. To confirm, write 1.`),
         crash = false;
 
     if (isChange) {
@@ -54,9 +54,10 @@ const changeMaxGamesForUser = async (robot, mess) => {
 const clearGamesList = async (robot, mess, args) => {
     if (await permsCheck(mess, "ADMINISTRATOR")) return
 
-    let clear = false
+    let clear = false,
+        users = await awaitMessages(mess, `Please @mention the users to be removed (or write "all" to remove all information) / Пожалуйста @упомяните пользователей, информацию о которых надо удалить (или напишите "all", чтобы удалить информацию обо всех)`)
 
-    if (args[1] === "all") {
+    if (users === "all") {
         clear = await confirmActions(mess)
 
         if (clear) {
@@ -128,12 +129,11 @@ const showGames = async (robot, mess) => {
         gamesSTR += `\n${user.username}#${user.discriminator} - ${sortedGames[id]}`;
     }
 
-
     await mess.channel.send({
         embeds: [
             await createEmbed({
                 title: "Games for the day / Игры за день",
-                description: gamesSTR,
+                description: gamesSTR.length > 0 ? gamesSTR : "No games played today",
             }, mess.guild.id),
         ],
     });

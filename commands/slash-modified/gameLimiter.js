@@ -2,51 +2,50 @@ const connectToDb = require("../../mongoconnect");
 const serverSchema = require("../../schemas/server-schema");
 const {createEmbed} = require("../../communication/embeds/embeds");
 const {permsCheck} = require("../../communication/permsCheck");
-const {uncaughtError} = require("../../communication/embeds/error-messages");
+const {uncaughtError, operationTerminatedMsg} = require("../../communication/embeds/error-messages");
 const {defaultSuccessMsg} = require("../../communication/embeds/success-messages");
+const {awaitMessages} = require("../../communication/interactions/awaitMessages");
+const {confirmActions} = require("../../communication/interactions/actionsConfirmation");
 
 const slash_changeMaxGamesForUser = async (robot, interaction, options) => {
     if (await permsCheck(interaction, "ADMINISTRATOR")) return
 
-    let maxGames = options.getNumber('count') <= 0 ? NaN : parseInt(options.getNumber('count'));
-    let crash = false;
+    interaction.reply({content: "starting..."})
+    let maxGames = parseInt(await awaitMessages(interaction, {content: `Please write the maximum number of games per day (or "off" to disable game limiter) / Пожалуйста напишите максимальное количество игр в день (или "off", чтобы выключить ограничитель игр)`
+    }))
 
-    const replied = await interaction.reply({
-        content: `Счетчик игр за сегодня будет сброшен в 0, количество максимальных запущенных игр за день будет изменено на ${isNaN(maxGames) ? "бесконечное" : maxGames}. Для подтверждения напишите 1. / 
-  The game counter for today will be reset to 0, and the number of maximum games played for the day will be changed to ${isNaN(maxGames) ? "infinity" : maxGames}. To confirm, write 1.`,
-    });
-    console.log(replied)
-     await replied.channel
-        .awaitMessages({
-            filter: () => interaction.content,
-            time: 30000,
-            max: 1,
-            errors: [],
-        })
-        .then((collected) => {
-            if (parseInt(collected.first().content) === 1) {
-                console.log("success")
+    let isChange = await confirmActions(interaction, `Счетчик игр за сегодня будет сброшен в 0, количество максимальных запущенных игр за день будет изменено на ${isNaN(maxGames) ? "бесконечное" : maxGames}. Для подтверждения напишите 1. /
+    The game counter for today will be reset to 0, and the number of maximum games played for the day will be changed to ${isNaN(maxGames) ? "infinity" : maxGames}. To confirm, write 1.`),
+        crash = false;
+
+    if (isChange) {
+        await connectToDb().then(async (mongoose) => {
+            try {
+                let res = await serverSchema.findOne({server: interaction.guild.id})
+                res.games.max = maxGames
+                await serverSchema.updateOne(
+                    {server: interaction.guild.id},
+                    {games: res.games}
+                );
+            } catch (e) {
+                await uncaughtError(interaction)
+                crash = true;
+            } finally {
+                await mongoose.endSession()
             }
         });
+        if (crash) return;
+        await interaction.channel.send({
+            embeds: [
+                await createEmbed({
+                    title: `Ограничитель игр ${isNaN(maxGames) ? "выключен" : `установлен на ${maxGames} игр`}! / Game limiter ${isNaN(maxGames) ? "off" : `set to ${maxGames} games`}!`
+                }, interaction.channel.send)
+            ]
+        })
+        return;
+    }
 
-    await connectToDb().then(async (mongoose) => {
-        try {
-            let res = await serverSchema.findOne({server: interaction.guild.id})
-            res.games.max = maxGames
-            await serverSchema.updateOne(
-                {server: interaction.guild.id},
-                {games: res.games}
-            );
-        } catch (e) {
-            await uncaughtError(interaction, true)
-            crash = true;
-        } finally {
-            await mongoose.endSession()
-        }
-    });
-    if (crash) return;
-    await interaction.reply(`Ограничитель игр ${isNaN(maxGames) ? "выключен" : `установлен на ${maxGames} игр`}! Счетчик игр за день был сброшен в 0 / Game limiter ${isNaN(maxGames) ? "off" : `set to ${maxGames} games`}! The game counter for the day has been reset to 0`)
-
+    await operationTerminatedMsg(interaction)
 };
 
 const slash_clearGamesList = async (robot, interaction, options) => {

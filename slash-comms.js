@@ -5,11 +5,13 @@ const types = Discord.Constants.ApplicationCommandOptionTypes
 const {slash_rewriteRules, slash_showRules, slash_addRules} = require("./commands/slash-modified/rules");
 const {slash_exportAsTXT} = require("./commands/slash-modified/exports");
 const {slash_botinfo, slash_help, slash_commandHelp} = require("./commands/slash-modified/help");
-const {slash_changeMaxGamesForUser, slash_clearGamesList, slash_showGames} = require("./commands/slash-modified/gameLimiter");
+const {
+    slash_changeMaxGamesForUser,
+    slash_clearGamesList,
+    slash_showGames
+} = require("./commands/slash-modified/gameLimiter");
 const {slash_showLB, slash_clearLB} = require("./commands/slash-modified/leaderboard");
-const {slash_setShowRightAns, slash_setPrefix, slash_setQuestionTimeout, slash_setGameStartPerms, slash_showSettings,
-    slash_setEmbedColor
-} = require("./commands/slash-modified/settings");
+const {slash_showSettings} = require("./commands/slash-modified/settings");
 const {slash_showQuestion} = require("./commands/slash-modified/questions");
 
 let slash_comms_list = [
@@ -62,16 +64,6 @@ let slash_comms_list = [
     //     }]
     // },
     {
-        name: "settimeout",
-        description: "Setting a new timeout for answering a question",
-        options: [{
-            name: "timeout",
-            description: "Timeout for answering a question in seconds",
-            required: true,
-            type: types.NUMBER
-        }]
-    },
-    {
         name: "botinfo",
         description: "Bot information"
     },
@@ -103,16 +95,6 @@ let slash_comms_list = [
             type: types.STRING
         }]
     },
-    {
-        name: "enablerightanswer",
-        description: "Setting the option to show the correct answer if no one answered correctly",
-        options: [{
-            name: "value",
-            description: "True - enable, false - disable",
-            required: true,
-            type: types.BOOLEAN
-        }]
-    },
     // {
     //     name: "edit",
     //     description: "Editing already added question",
@@ -135,13 +117,7 @@ let slash_comms_list = [
     },
     {
         name: "maxgames",
-        description: "Setting the parameter of the maximum running games by 1 person per day",
-        options: [{
-            name: "max",
-            description: "The maximum number of games that 1 person can play per day",
-            required: true,
-            type: types.NUMBER
-        }]
+        description: "Setting the parameter of the maximum running games by 1 person per day"
     },
     {
         name: "addrule",
@@ -168,17 +144,7 @@ let slash_comms_list = [
         description: "Show started games by user"
     },
     {
-        name: "setgamestartperms",
-        description: "Setting a restriction on the launch of games by perms",
-        options: [{
-            name: "perms",
-            description: "Permissions required to run the game (ADMINISTRATOR, MANAGE_ROLES, MANAGE_CHANNELS, everyone)",
-            required: true,
-            type: types.STRING
-        }]
-    },
-    {
-        name: "exportastxt",
+        name: "export",
         description: "Export questions from the database to a .txt file",
         options: [{
             name: "ids",
@@ -188,29 +154,9 @@ let slash_comms_list = [
         }]
     },
     {
-        name: "prefix",
-        description: "New server prefix of the bot",
-        options: [{
-            name: "prefix",
-            description: "New prefix",
-            required: true,
-            type: types.STRING
-        }]
-    },
-    {
         name: "settings",
         description: "Show bot settings"
-    },
-    {
-        name: "color",
-        description: "Changes message stroke color",
-        options: [{
-            name: "color",
-            description: "New color (hex)",
-            required: true,
-            type: types.STRING
-        }]
-    },
+    }
 ];
 
 const replySlash = async (robot, interaction) => {
@@ -226,7 +172,7 @@ const replySlash = async (robot, interaction) => {
         case "addrule":
             await slash_addRules(robot, interaction, options)
             break
-        case "exportastxt":
+        case "export":
             await slash_exportAsTXT(robot, interaction, options)
             break
         case "botinfo":
@@ -239,7 +185,7 @@ const replySlash = async (robot, interaction) => {
             await slash_commandHelp(robot, interaction, options)
             break
         case "maxgames":
-            await slash_changeMaxGamesForUser(robot, interaction, options)
+            await slash_changeMaxGamesForUser(robot, interaction)
             break
         case "cleargames":
             await slash_clearGamesList(robot, interaction, options)
@@ -253,26 +199,11 @@ const replySlash = async (robot, interaction) => {
         case "clearlb":
             await slash_clearLB(robot, interaction, options)
             break
-        case "enablerightanswer":
-            await slash_setShowRightAns(robot, interaction, options)
-            break
-        case "prefix":
-            await slash_setPrefix(robot, interaction, options)
-            break
-        case "settimeout":
-            await slash_setQuestionTimeout(robot, interaction, options)
-            break
-        case "setgamestartprems":
-            await slash_setGameStartPerms(robot, interaction, options)
-            break
         case "show":
             await slash_showQuestion(robot, interaction, options)
             break
         case "settings":
             await slash_showSettings(robot, interaction)
-            break
-        case "color":
-            await slash_setEmbedColor(robot, interaction, options)
             break
         default:
     }
