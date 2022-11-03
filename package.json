@@ -1,11 +1,11 @@
 {
   "name": "quizbot",
-  "version": "1.1.0",
+  "version": "1.1.0b",
   "description": "The best bot for quizzes in discord",
-  "main": "bot.js",
+  "main": "Bot.js",
   "scripts": {
-    "start": "node bot.js",
-    "dev": "node_modules/.bin/nodemon bot.js --config nodemon.json"
+    "start": "node Bot.js",
+    "dev": "node_modules/.bin/nodemon Bot.js --config nodemon.json"
   },
   "keywords": [
     "discord",
@@ -20,8 +20,7 @@
   "dependencies": {
     "discord.js": "13.5.1",
     "dotenv": "^10.0.0",
-    "express": "^4.17.1",
-    "mongoose": "^6.0.0",
+    "pg": "^8.7.3",
     "random": "^3.0.6",
     "validator": "^13.6.0"
   },

@@ -1,116 +1,80 @@
-const connectToDb = require('../mongoconnect');
-const serverSchema = require("../schemas/server-schema");
+const leaderboardController = require('../database/controllers/leaderboard.controller')
+const serverController = require('../database/controllers/servers.controller')
+const Embeds = require('../functions/Embeds')
+const Interactions = require('../functions/Interactions')
+const {permsCheck} = require("../functions/permsCheck");
 
-const {createEmbed} = require("../communication/embeds/embeds");
-const {permsCheck} = require("../communication/permsCheck");
-const {invalidUserError, operationTerminatedMsg} = require("../communication/embeds/error-messages");
-const {defaultSuccessMsg} = require("../communication/embeds/success-messages");
-const {confirmActions} = require("../communication/interactions/actionsConfirmation");
-
-const showLB = async (robot, mess) => {
-    let res = {}
-    await connectToDb().then(async mongoose => {
-        try {
-            res = await serverSchema.findOne({server: mess.guild.id})
-        } finally {
-            await mongoose.endSession()
+class Leaderboard {
+    async show(msg, client) {
+        const users = await serverController.getServer(msg.guild.id)
+        const points = {}
+        for (const u of users.users) {
+            points[u] = await leaderboardController.getUserOnServer(u, msg.guild.id)
         }
-    })
-    let lb = res.leaderboard;
 
-    const sortedPoints = Object.fromEntries(
-        Object.entries(lb).sort(([, a], [, b]) => b - a)
-    );
+        const sortedPoints = Object.fromEntries(
+            Object.entries(points).sort(([, a], [, b]) => b - a)
+        );
 
-    let pointsArr = [""],
-        arrID = 0
-    let ids = Object.keys(sortedPoints)
-    
-    if(ids.length > 25) {
-        await mess.channel.send({
-            content: "Generating leaderboard message... Please wait / Генерируем сообщение с лидербордом... Пожалуйста подождите"
-        })
-    }
+        let pointsArr = [""],
+            arrID = 0,
+            ids = Object.keys(sortedPoints)
 
-    for (const id of ids) {
-        const user = await robot.users.fetch(id)
-
-        if(pointsArr[arrID].length > 1900) {
-            arrID++
+        if (ids.length === 0) {
+            await Embeds.errors.emptyDatabase(client, msg.guild.id, msg.channel.id)
         }
-        pointsArr[arrID] += `\n${user.username}#${user.discriminator} - ${sortedPoints[id]}`
-    }
 
-    for (let i = 0; i < pointsArr.length; i++) {
-        await mess.channel.send({
-            embeds: [
-                await createEmbed({
-                    title: i === 0 ? "Server leaderboard / Таблица лидеров сервера" : `Страница #${i+1} / Page #${i+1}`,
-                    description: pointsArr[i],
-                }, mess.guild.id),
-            ],
-        });
-    }
-};
-
-const updateLB = async (mess, userID, value) => {
-    let res = {}
-    await connectToDb().then(async mongoose => {
-        try {
-            res = await serverSchema.findOne({server: mess.guild.id})
-        } finally {
-            await mongoose.endSession()
+        if (ids.length > 25) {
+            await msg.channel.send({
+                embeds: [await Embeds.create({
+                    title: "Generating leaderboard message... Please wait / Генерируем сообщение с лидербордом... Пожалуйста подождите"
+                }, msg.guild.id)]
+            })
         }
-    })
-    let lb = res.leaderboard;
 
-    if (!lb[userID]) {
-        lb[userID] = value;
-    } else {
-        lb[userID] += value;
-    }
+        for (const id of ids) {
+            const user = await client.users.fetch(id)
 
-    await connectToDb().then(async mongoose => {
-        try {
-            await serverSchema.updateOne({server: mess.guild.id}, {leaderboard: lb, questionIDs: []})
-        } finally {
-            await mongoose.endSession()
-        }
-    })
-};
-
-const clearLB = async (robot, mess, args) => {
-    if (await permsCheck(mess, "MANAGE_ROLES")) return
-
-    let user = ""
-    if (args[1] === "all") user = "all"
-    else if (mess.mentions.users.first()) user = mess.mentions.users.first().id
-    else {
-        await invalidUserError(mess)
-        return;
-    }
-
-    if (await permsCheck(mess, "ADMINISTRATOR")) return
-
-    let clear = await confirmActions(mess)
-
-    if (clear) {
-        await connectToDb().then(async mongoose => {
-            try {
-                await serverSchema.updateOne({server: mess.guild.id}, {
-                    leaderboard:
-                        user === "all" ? {} : {
-                            [user]: 0
-                        }
-                })
-            } finally {
-                await mongoose.endSession()
+            if (pointsArr[arrID].length > 1900) {
+                arrID++
             }
-        })
-        await defaultSuccessMsg(mess)
-    } else {
-        await operationTerminatedMsg(mess)
-    }
-};
 
-module.exports = {showLB, updateLB, clearLB};
+            if (sortedPoints[id] !== 0) {
+                pointsArr[arrID] += `\n${user.username}#${user.discriminator} - ${sortedPoints[id]}`
+            }
+        }
+
+        if (pointsArr[0].length === 0 && arrID === 0){
+            pointsArr[0] = "Server leaderboard is empty!"
+        }
+
+        for (let i = 0; i < pointsArr.length; i++) {
+            await msg.channel.send({
+                embeds: [
+                    await Embeds.create({
+                        title: i === 0 ? "Server leaderboard / Таблица лидеров сервера" : `Страница #${i + 1} / Page #${i + 1}`,
+                        description: pointsArr[i],
+                    }, msg.guild.id),
+                ],
+            });
+        }
+    }
+
+    async clear(msg, client) {
+        if (!await permsCheck(client, msg.guild.id, msg.channel.id, msg.member, 8)) return
+
+        if (await Interactions.confirmActions(client, msg.guild.id, msg.channel.id)) {
+            const users = await serverController.getServer(msg.guild.id)
+
+            for (const user of users) {
+                await leaderboardController.update(user, msg.guild.id, 0)
+            }
+
+            await Embeds.success.defaultSuccess(client, msg.guild.id, msg.channel.id)
+        } else {
+            await Embeds.errors.operationTerminated(client, msg.guild.id, msg.channel.id)
+        }
+    }
+}
+
+module.exports = new Leaderboard()

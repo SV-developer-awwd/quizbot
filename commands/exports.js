@@ -3,52 +3,66 @@ const fs = require("fs");
 const path = require("path");
 const random = require('random')
 
-const connectToDb = require("../mongoconnect");
-const serverSchema = require("../schemas/server-schema");
-const {txtGenerator} = require("../communication/exportGenerators");
-const {permsCheck} = require("../communication/permsCheck");
-const {uncaughtError} = require("../communication/embeds/error-messages");
-const {getQIDs} = require("../communication/interactions/getQIDs");
+const {txtGenerator} = require("../functions/exportGenerators");
+const {permsCheck} = require("../functions/permsCheck");
+const Embeds = require('../functions/Embeds')
+const Interactions = require('../functions/Interactions')
 
-const exportAsTXT = async (robot, mess) => {
-    if (await permsCheck(mess, "MANAGE_ROLES")) return
+class Exports {
+    async chooseFormat(msg, client) {
+        if (!await permsCheck(client, msg.guild.id, msg.channel.id, msg.member, 2)) return
 
-    let res = {}
-    await connectToDb().then(async mongoose => {
-        try {
-            res = await serverSchema.findOne({server: mess.guild.id})
-        } finally {
-            await mongoose.endSession()
+        const exportType = parseInt(await Interactions.menu(client, msg.guild.id, msg.channel.id, [{
+            label: "Text document",
+            description: "*.txt",
+            value: "1"
+        }], {embeds: await Embeds.create({
+                title: "please select the file extension to which the questions will be exported:"
+            }, msg.guild.id)}))
+
+        switch (exportType) {
+            case 1:
+                await this.#txt(client, msg.guild.id, msg.channel.id, msg.member)
+                break
+            default:
+                await Embeds.errors.invalidValue(client, msg.guild.id, msg.channel.id)
         }
-    })
-    let questions = res.questions;
-    questions = questions.filter(q => q !== null)
-
-    const qIDs = await getQIDs(mess)
-
-    if (qIDs.length < 1) {
-        await mess.channel.send({content: "No questions to export! / Нет вопросов для экспорта!"})
-        return
     }
 
-    const string = txtGenerator(qIDs, questions)
+    async #txt(client, guild_id, channel_id, member_id) {
+        const channel = client.channels.cache.get(channel_id)
 
-    try {
-        const requestID = random.int(100000, 999999)
-        await fs.writeFile(path.resolve(__dirname, "..", "storage", `questions-${requestID}.txt`), string, () => {
-        })
+        const qIDs = await Interactions.getQuestionIds(client, guild_id, channel_id, member_id)
 
-        const attachment = new MessageAttachment(path.resolve(__dirname, "..", "storage", `questions-${requestID}.txt`), `questions-${requestID}.txt`)
-        await mess.channel.send({
-            content: "Success!",
-            files: [attachment]
-        })
+        if (qIDs.length < 1) {
+            await Embeds.errors.emptyDatabase(client, guild_id, channel_id)
+            return
+        }
 
-        await fs.unlink(path.resolve(__dirname, "..", "storage", `questions-${requestID}.txt`), () => {
-        })
-    } catch (e) {
-        await uncaughtError(mess)
+        for (let i = 0; i < qIDs.length; i++) {
+            qIDs[i] = parseInt(qIDs[i])
+        }
+
+        qIDs.filter(e => !isNaN(e))
+        qIDs.filter(e => e !== null)
+
+        const string = txtGenerator(guild_id, qIDs)
+
+        try {
+            const requestID = random.int(100000, 999999)
+            await fs.writeFile(path.resolve(__dirname, "..", "storage", `questions-${requestID}.txt`), string, () => {
+            })
+
+            const attachment = new MessageAttachment(path.resolve(__dirname, "..", "storage", `questions-${requestID}.txt`), `questions-${requestID}.txt`)
+            await Embeds.success.defaultSuccess(client, guild_id, channel_id)
+            await channel.send({files: [attachment]})
+
+            await fs.unlink(path.resolve(__dirname, "..", "storage", `questions-${requestID}.txt`), () => {
+            })
+        } catch (e) {
+            await Embeds.errors.uncaughtError(client, guild_id, channel_id)
+        }
     }
 }
 
-module.exports = {exportAsTXT}
+module.exports = new Exports()

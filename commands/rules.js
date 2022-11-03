@@ -1,100 +1,67 @@
-const connectToDb = require("../mongoconnect");
-const serverSchema = require("../schemas/server-schema");
-const {createEmbed} = require("../communication/embeds/embeds");
-const {getRules} = require("../communication/getters");
-const {permsCheck} = require("../communication/permsCheck");
-const {tooLongRulesError, uncaughtError} = require("../communication/embeds/error-messages");
-const {defaultSuccessMsg} = require("../communication/embeds/success-messages");
-const {awaitMessages} = require("../communication/interactions/awaitMessages");
+const settingsController = require('../database/controllers/settings.controller')
+const Embeds = require('../functions/Embeds')
+const Interactions = require('../functions/Interactions')
+const {permsCheck} = require("../functions/permsCheck")
 
-const rewriteRules = async (robot, mess) => {
-    if (await permsCheck(mess, "MANAGE_ROLES")) return
+class Rules {
+    async add (msg, client) { // old + new
+        if (!await permsCheck(client, msg.guild.id, msg.client.id, msg.member, 2)) return
 
-    const newRules = await awaitMessages(mess, {
-        embeds: [await createEmbed({
-            title: "Please write new rules below / Пожалуйста напишите новые правила ниже",
-            footer: `1999 symbols max`
-        }, mess.guild.id)]
-    })
-    if (newRules.length > 1999) {
-        await tooLongRulesError(mess)
-        return
-    }
+        const data = await settingsController.getSettings(msg.guild.id)
+        let rules = data.rules
 
-    try {
-        await connectToDb().then(async (mongoose) => {
-            try {
-                await serverSchema.updateOne(
-                    {server: mess.guild.id},
-                    {rules: newRules}
-                );
-            } finally {
-                await mongoose.endSession()
-            }
-        });
-
-        await defaultSuccessMsg(mess)
-    } catch (e) {
-        await uncaughtError(mess)
-    }
-};
-
-const showRules = async (robot, mess) => {
-    let res = {};
-    await connectToDb().then(async (mongoose) => {
-        try {
-            res = await serverSchema.findOne({server: mess.guild.id});
-        } finally {
-            await mongoose.endSession()
+        if (rules.length > 1950) {
+            await Embeds.errors.tooLongValue(client, msg.guild.id, msg.channel.id)
+            return
         }
-    });
-    const rules = res.rules;
 
-    await mess.channel.send({
-        embeds: [
-            await createEmbed({
-                title: "Правила игры: ",
-                description: rules,
-            }, mess.guild.id),
-        ],
-    });
-};
+        const newRule = await Interactions.awaitMessages(msg, {
+            embeds: [await Embeds.create({
+                title: "Please write new rule below / Пожалуйста напишите новое правило ниже",
+                footer: `${1999 - rules.length} symbols max`
+            }, msg.guild.id)]
+        })
+        rules += `\n${newRule}`;
 
-const addRules = async (robot, mess) => {
-    if (await permsCheck(mess, "MANAGE_ROLES")) return
+        if (rules.length > 1999) {
+            await Embeds.errors.tooLongValue(client, msg.guild.id, msg.channel.id)
+            return
+        }
 
-    let rules = await getRules(mess.guild.id);
-    if (rules.length > 1950) {
-        await tooLongRulesError(mess)
-        return
+        await settingsController.updateSettings(msg.guild.id, {rules})
+        await Embeds.success.defaultSuccess(client, msg.guild.id, msg.channel.id)
     }
 
-    const newRule = await awaitMessages(mess, {
-        embeds: [await createEmbed({
-            title: "Please write new rule below / Пожалуйста напишите новое правило ниже",
-            footer: `${1999 - rules.length} symbols max`
-        }, mess.guild.id)]
-    })
-    rules += `\n${newRule}`;
+    async rewrite (msg, client) { // only new
+        if (!await permsCheck(client, msg.guild.id, msg.channel.id, msg.member, 2)) return
 
-    if (rules.length > 1999) {
-        await tooLongRulesError(mess)
-        return
+        const newRules = await Interactions.awaitMessages(msg, {
+            embeds: [await Embeds.create({
+                title: "Please write new rules below / Пожалуйста напишите новые правила ниже",
+                footer: `1999 symbols max`
+            }, msg.guild.id)]
+        })
+        if (newRules.length > 1999) {
+            await Embeds.errors.tooLongValue(client, msg.guild.id, msg.channel.id)
+            return
+        }
+
+        await settingsController.updateSettings(msg.guild.id, {rules: newRules})
+        await Embeds.success.defaultSuccess(client, msg.guild.id, msg.channel.id)
     }
 
-    try {
-        await connectToDb().then(async (mongoose) => {
-            try {
-                await serverSchema.updateOne({server: mess.guild.id}, {rules});
-            } finally {
-                await mongoose.endSession()
-            }
-        });
+    async show (msg) {
+        let data = await settingsController.getSettings(msg.guild.id)
 
-        await defaultSuccessMsg(mess)
-    } catch (e) {
-        await uncaughtError(mess)
+        await msg.channel.send({
+            embeds: [
+                await Embeds.create({
+                    title: "Правила игры: ",
+                    description: data.rules,
+                }, msg.guild.id),
+            ],
+        })
     }
-};
+}
 
-module.exports = {showRules, rewriteRules, addRules};
+module.exports = new Rules()

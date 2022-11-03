@@ -1,554 +1,390 @@
-const connectToDb = require('../mongoconnect');
-const serverSchema = require("../schemas/server-schema");
-const {createEmbed} = require("../communication/embeds/embeds");
 const randomizer = require("random");
-const {permsCheck} = require("../communication/permsCheck");
-const {
-    noResponseError,
-    uncaughtError,
-    invalidQuestionID,
-    operationTerminatedMsg, invalidValueError
-} = require("../communication/embeds/error-messages");
-const {defaultSuccessMsg} = require("../communication/embeds/success-messages");
-const {awaitMessages} = require("../communication/interactions/awaitMessages");
-const {chooseOptionMenu} = require("../communication/interactions/chooseOptionMenu");
-const {getQIDs} = require("../communication/interactions/getQIDs");
-const {confirmActions} = require("../communication/interactions/actionsConfirmation");
+const Embeds = require('../functions/Embeds')
+const Interactions = require('../functions/Interactions')
+const questionController = require("../database/controllers/question.controller")
+const {permsCheck} = require("../functions/permsCheck");
 
-const addQuestion = async (robot, mess, args) => {
-    if (await permsCheck(mess, "MANAGE_ROLES")) return
-    const count = args[1] !== "" ? parseInt(args[1]) : 1
+class Questions {
+    async add(msg, client) {
+        if (!await permsCheck(client, msg.guild.id, msg.channel.id, msg.member, 2)) return
+        const count = parseInt(await Interactions.awaitMessages(client, msg.channel.id, msg.member.id, {embeds: [await Embeds.create({title: "How many questions do you want to add?"}, msg.guild.id)]}))
 
-    for (let i = 0; i < count; i++) {
-        let res = {}
-        await connectToDb().then(async mongoose => {
+        for (let i = 0; i < count; i++) {
+            let question = await Interactions.awaitMessages(client, msg.channel.id, msg.member.id, {embeds: [await Embeds.create({title: "Please write a question"}, msg.guild.id)]})
+            if (!question) {
+                await Embeds.errors.noResponse(client, msg.guild.id, msg.channel.id)
+                return
+            }
+
+            let answer = await Questions.#getAnswers(client, msg.guild.id, msg.channel.id, msg.member.id, question),
+                answer_type = answer.answer_type,
+                images = await Questions.#getImages(client, msg.guild.id, msg.channel.id, msg.member.id)
+            answer = answer.answers
+            images = images.images
+
+            if (!question) {
+                await Embeds.errors.noResponse(client, msg.guild.id, msg.channel.id)
+                return
+            }
+
+            let timestampEnd = JSON.stringify(Date.now()).split("")
+            timestampEnd = timestampEnd.slice(timestampEnd.length - 5)
+            const id = randomizer.int(100_000, 999_999) + timestampEnd.join("")
+
+            const newQ = {
+                question_id: id,
+                question,
+                answer_type,
+                answers: answer,
+                images
+            }
+
             try {
-                res = await serverSchema.findOne({server: mess.guild.id})
-            } finally {
-                await mongoose.endSession()
+                await questionController.createQuestion(msg.guild.id, newQ)
+
+                await msg.channel.send({
+                    embeds: [await Embeds.create({
+                        title: `Question successfully added`,
+                        author: `ID of question - ${newQ.question_id}`,
+                    }, msg.guild.id)],
+                });
+            } catch (e) {
+                await Embeds.errors.uncaughtError(client, msg.guild.id, msg.channel.id)
             }
-        })
-        let questions = res.questions;
-
-        let newQuestionID = randomizer.int(10000, 99999)
-
-        let newQuestion = await awaitMessages(mess, {content: "Please write a question / Пожалуйста напишите вопрос"}),
-            countOfAnswers = parseInt(await awaitMessages(mess, {content: "Please write count of answers. / Пожалуйста напишите количество ответов для вопроса"})),
-            answers = [],
-            rightAnswer = 0,
-            countOfImages = 0,
-            images = []
-
-        if (!newQuestion) {
-            await noResponseError(mess)
-            return;
         }
+    }
 
-        if (isNaN(countOfAnswers)) {
-            await invalidValueError(mess)
+    async delete(msg, client) {
+        if (!await permsCheck(client, msg.guild.id, msg.channel.id, msg.member, 2)) return
+
+        if (await questionController.getAllQuestions(msg.guild.id).length < 1) {
+            await Embeds.errors.emptyDatabase(client, msg.guild.id, msg.channel.id)
             return
         }
 
-        for (let i = 0; i < countOfAnswers; i++) {
-            const ans = await awaitMessages(mess, {
-                content: `Please write ${i === 0 ? "first" : "next"} answer for question /
-      Пожалуйста напишите ${
-                    i === 0 ? "первый" : "следующий"
-                } ответ для вопроса`
-            })
-
-            if (!ans) {
-                await noResponseError(mess)
-                return;
+        const qIDs = await Interactions.getQuestionIds(client, msg.guild.id, msg.channel.id, msg.member.id)
+        if (qIDs === -1) {
+            if (await Interactions.confirmActions(client, msg.guild.id, msg.channel.id)) {
+                await questionController.deleteAllQuestions(msg.guild.id)
+                await Embeds.success.defaultSuccess(client, msg.guild.id, msg.channel.id)
+                return
             }
 
-            answers.push(ans)
-        }
-
-        rightAnswer = await awaitMessages(mess, {
-            content: `Please write the correct answer number for the question /
-    Пожалуйста напишите правильный номер ответа для вопроса`
-        })
-
-        if (!rightAnswer) {
-            await noResponseError(mess)
+            await Embeds.errors.operationTerminated(client, msg.guild.id, msg.channel.id)
             return
         }
 
-        countOfImages = await chooseOptionMenu(mess, [
-            {
-                label: 'No images',
-                description: '',
-                value: 'zero',
-            },
-            {
-                label: '1',
-                description: '',
-                value: 'one',
-            },
-            {
-                label: '2',
-                description: '',
-                value: 'two',
-            },
-            {
-                label: '3',
-                description: '',
-                value: 'three',
-            },
-            {
-                label: '4',
-                description: '',
-                value: 'four',
-            },
-            {
-                label: '5',
-                description: '',
-                value: 'five',
+        try {
+            for (let i = 0; i < qIDs.length; i++) {
+                await questionController.deleteQuestion(msg.guild.id, qIDs[i])
             }
-        ], "Please choose count of images for question. / Пожалуйста выберите количество картинок для вопроса. ")
 
-        countOfImages = countOfImages[0]
+            await Embeds.success.defaultSuccess(client, msg.guild.id, msg.channel.id)
+        } catch (e) {
+            await Embeds.errors.uncaughtError(client, msg.guild.id, msg.channel.id)
+        }
+    }
 
-        switch (countOfImages) {
-            case "zero":
-                countOfImages = 0;
+    async show(msg, client) {
+        if (!await permsCheck(client, msg.guild.id, msg.channel.id, msg.member, 2)) {
+            return
+        }
+        const ids = await Interactions.getQuestionIds(client, msg.guild.id, msg.channel.id, msg.member.id)
+
+        if (ids === -1) {
+            const questions = await questionController.getAllQuestions(msg.guild.id)
+            if (questions.length < 1) {
+                await Embeds.errors.emptyDatabase(client, msg.guild.id, msg.channel.id)
+                return
+            }
+
+            let str = ""
+
+            const sortedQuestions = questions.sort((a, b) =>
+                a.question_id > b.question_id ? 1 : -1
+            );
+
+            for (let q of sortedQuestions) {
+                str += `${q.question_id} - ${q.question}\n`;
+            }
+
+            await msg.channel.send({
+                embeds: [
+                    await Embeds.create({
+                        title: "Questions",
+                        description: str,
+                    }, msg.guild.id),
+                ],
+            });
+
+            return
+        }
+
+        ids.forEach(e => parseInt(e))
+        ids.filter(e => !isNaN(e))
+
+        if (ids.length < 1) {
+            await Embeds.errors.invalidQuestionId(client, msg.guild.id, msg.channel.id)
+            return
+        }
+
+        for (let i = 0; i < ids.length; i++) {
+            const question = await questionController.getOneQuestion(msg.guild.id, ids[i])
+
+            switch (question.answer_type) {
+                case 0:
+                    await Questions.#showChoosable(client, msg.guild.id, msg.channel.id, question)
+                    break
+                case 1:
+                    await Questions.#showTypeable(client, msg.guild.id, msg.channel.id, question)
+                    break
+                default:
+            }
+        }
+    }
+
+    async edit(msg, client) {
+        if (!await permsCheck(client, msg.guild.id, msg.channel.id, msg.member, 2)) return
+
+        const id = await Interactions.getQuestionIds(client, msg.guild.id, msg.channel.id, msg.member.id, true)
+        const question = await questionController.getOneQuestion(msg.guild.id, id)
+
+        if (!question) {
+            await Embeds.errors.invalidQuestionId(client, msg.guild.id, msg.channel.id)
+            return
+        }
+
+        switch (question.answer_type) {
+            case 0:
+                await Questions.#showChoosable(client, msg.guild.id, msg.channel.id, question)
                 break
-            case "one":
-                countOfImages = 1;
-                break
-            case "two":
-                countOfImages = 2;
-                break
-            case "three":
-                countOfImages = 3;
-                break
-            case "four":
-                countOfImages = 4;
-                break
-            case "five":
-                countOfImages = 5;
+            case 1:
+                await Questions.#showTypeable(client, msg.guild.id, msg.channel.id, question)
                 break
             default:
         }
 
-        if (typeof countOfImages !== "number") {
-            await noResponseError(mess)
-            return
+        const options = [{
+            label: "Right answer",
+            description: "Change the right answer",
+            value: "1"
+        },
+            {
+                label: "Answers",
+                description: "Rewriting all answers for the question",
+                value: "2"
+            },
+            {
+                label: "Images",
+                description: "Rewriting all images' links for the question",
+                value: "3"
+            },
+            {
+                label: "Cancel operation",
+                value: "0"
+            }]
+
+        if (question.answer_type === 1) {
+            options.splice(1, 1)
         }
 
+        const param = await Interactions.menu(client, msg.guild.id, msg.channel.id, options,
+                {embeds: [await Embeds.create({title: "Please choose the param:"}, msg.guild.id)]}),
+            newValue = {}
+        switch (param) {
+            case 0:
+                await Embeds.errors.operationTerminated(client, msg.guild.id, msg.channel.id)
+                return
+            case 1:
+                if (question.answer_type === 1) {
+                    newValue.answers = await Questions.#getAnswers(client, msg.guild.id, msg.channel.id, msg.member.id, question.question)
+                    newValue.answer_type = newValue.answers.answer_type
+                    newValue.answers = newValue.answers.answers
+                    break
+                }
+
+                newValue.answers = await Questions.#getRightAnswerChoosable(client, msg.guild.id, msg.channel.id, question.answers, question.question)
+                break
+            case 2:
+                newValue.answers = await Questions.#getAnswers(client, msg.guild.id, msg.channel.id, msg.member.id, question.question)
+                newValue.answer_type = newValue.answers.answer_type
+                newValue.answers = newValue.answers.answers
+                break
+            case 3:
+                newValue.images = await Questions.#getImages(client, msg.guild.id, msg.channel.id, msg.member.id)
+
+                if (newValue.images.images.length < 1 || newValue.images.countOfImages === 0) {
+                    await Embeds.errors.operationTerminated(client, msg.guild.id, msg.channel.id)
+                    return
+                }
+
+                newValue.images = newValue.images.images
+                break;
+            default:
+        }
+
+        const isEdit = await Interactions.confirmActions(client, msg.guild.id, msg.channel.id)
+
+        if (isEdit) {
+            await questionController.updateQuestion(msg.guild.id, id, newValue)
+
+            await Embeds.success.defaultSuccess(client, msg.guild.id, msg.channel.id)
+        }
+    }
+
+    static async #getAnswers(client, guild_id, channel_id, member_id, question) {
+        const answer_type = parseInt(await Interactions.menu(client, guild_id, channel_id, [
+            {
+                label: "Choosable answers",
+                description: "User should choose one of answer",
+                value: "0"
+            }, {
+                label: "Typeable answer",
+                description: "User should type answer using keyboard",
+                value: "1"
+            }], {embeds: [await Embeds.create({title: "Please choose the type of answer:"}, guild_id)]}
+        ))
+
+        const answer = {}
+        switch (answer_type) {
+            case 0:
+                const countOfAnswers = await Interactions.menu(client, guild_id, channel_id, [
+                    {label: "2", value: "2"},
+                    {label: "3", value: "3"},
+                    {label: "4", value: "4"},
+                    {label: "5", value: "5"},
+                    {label: "6", value: "6"},
+                    {label: "7", value: "7"},
+                    {label: "8", value: "8"},
+                    {label: "9", value: "9"},
+                    {label: "10", value: "10"}
+                ], {embeds: [await Embeds.create({title: "Please choose count of answers: "}, guild_id)]})
+
+                for (let i = 0; i < countOfAnswers; i++) {
+                    const ans = await Interactions.awaitMessages(client, channel_id, member_id, {
+                        embeds: [
+                            await Embeds.create({title: `Please write ${i === 0 ? "first" : "next"} answer for question`}, guild_id)
+                        ]
+                    })
+
+                    if (!ans) {
+                        await Embeds.errors.noResponse(client, guild_id, channel_id)
+                        return;
+                    }
+
+                    answer[i] = ans
+                }
+
+                answer.rightChoosable = await Questions.#getRightAnswerChoosable(client, guild_id, channel_id, answer, question)
+
+                if (!answer.rightChoosable) {
+                    await Embeds.errors.noResponse(client, guild_id, channel_id)
+                    return
+                }
+                break
+            case 1:
+                answer.typeable = await Interactions.awaitMessages(client, channel_id, member_id, {
+                    embeds: [await Embeds.create({title: `Please write the right answer for the question:`}, guild_id)]
+                })
+                break
+            default:
+        }
+
+        return {answer_type, answers: answer}
+    }
+
+    static async #getImages(client, guild_id, channel_id, member_id) {
+        const images = []
+
+        const countOfImages = parseInt(await Interactions.menu(client, guild_id, channel_id, [{
+            label: 'No images', description: '', value: '0',
+        }, {
+            label: '1', description: '', value: '1',
+        }, {
+            label: '2', description: '', value: '2',
+        }, {
+            label: '3', description: '', value: '3',
+        }, {
+            label: '4', description: '', value: '4',
+        }, {
+            label: '5', description: '', value: '5',
+        }], {embeds: [await Embeds.create({title: "Please choose count of images for question"}, guild_id)]}))
+
+
         for (let i = 0; i < countOfImages; i++) {
-            let image = await awaitMessages(mess, {
-                content: `Please write ${
-                    i === 0 ? "first" : "next"
-                } link with image. Image must be uploaded to discord as message earlier. /
-      Пожалуйста напишите ${
-                    i === 0 ? "первую" : "следующую"
-                } ссылку с картинкой. Картинка должна быть загружена в виде сообщения в discord ранее.`,
+            let image = await Interactions.awaitMessages(client, channel_id, member_id, {
+                embeds: [await Embeds.create({title: `Please write ${i === 0 ? "first" : "next"} link with image. Image must be uploaded to discord as message earlier`}, guild_id)]
             })
-            if (
-                image.indexOf("https://media.discordapp.net/attachments/") === -1 ||
-                image.length < 42
-            ) {
-                await mess.channel.send(
-                    {content: "Invalid URL to picture. / Невалидная ссылка на картинку"}
-                )
+
+            if (image.indexOf("https://media.discordapp.net/attachments/") === -1 || image.length < 42) {
+                await Embeds.errors.invalidImageUrl(client, guild_id, channel_id)
             } else {
                 images.push(image.split("?")[0]);
             }
         }
 
-        const newQ = {
-            questionID: newQuestionID,
-            question: newQuestion,
-            answer: rightAnswer,
-            answers,
-            images,
-        }
+        return {images, countOfImages}
+    }
 
-        questions.push(newQ);
+    static async #getRightAnswerChoosable(client, guild_id, channel_id, answers, question) {
+        let options = []
+        for (const key of Object.keys(answers)) {
+            if (key === "rightChoosable") {
+                continue
+            }
 
-        questions = questions.filter((question) => question !== null);
-
-        try {
-            await connectToDb().then(async mongoose => {
-                try {
-                    await serverSchema.updateOne({server: mess.guild.id}, {questions})
-                } finally {
-                    await mongoose.endSession()
-                }
+            options.push({
+                label: answers[key],
+                value: JSON.stringify(Object.keys(answers).indexOf(key))
             })
-            await mess.channel.send({
-                embeds: [
-                    await createEmbed({
-                        title: `Question successfully added.\n Вопрос успешно добавлен.`,
-                        author: `ID of question - ${newQuestionID}`,
-                    }, mess.guild.id),
-                ],
-            });
-        } catch (e) {
-            await uncaughtError(mess)
-        }
-    }
-};
-
-const deleteQuestion = async (robot, mess) => {
-    if (await permsCheck(mess, "MANAGE_ROLES")) return
-    let res = {}
-    await connectToDb().then(async mongoose => {
-        try {
-            res = await serverSchema.findOne({server: mess.guild.id})
-        } finally {
-            await mongoose.endSession()
-        }
-    })
-    let questions = res.questions;
-    let qIDs = await getQIDs(mess)
-
-    let deleteAll = false
-    if (qIDs.indexOf("all") !== -1) {
-        deleteAll = true
-    }
-
-    if (!deleteAll) {
-        for (let i = 0; i < qIDs.length; i++) {
-            qIDs[i] = parseInt(qIDs[i])
         }
 
-        if (qIDs.length >= 5) {
-            if (await permsCheck(mess, "ADMINISTRATOR")) return
-        }
-
-        for (let q of questions) {
-            if (q === null) {
-                continue;
-            }
-
-            if (qIDs.indexOf(q.questionID) !== -1) {
-                delete questions[questions.indexOf(q)];
-            }
-        }
-    } else {
-        if (await permsCheck(mess, "ADMINISTRATOR")) return
-
-        let clear = await confirmActions(mess)
-        if (clear) {
-            questions = []
-        }
-    }
-
-    try {
-        await connectToDb().then(async mongoose => {
-            try {
-                await serverSchema.updateOne({server: mess.guild.id}, {questions})
-            } finally {
-                await mongoose.endSession()
-            }
+        return await Interactions.menu(client, guild_id, channel_id, options, {
+            embeds: [await Embeds.create({
+                title: "Choose the right answer for question:",
+                description: question
+            }, guild_id)]
         })
-        await defaultSuccessMsg(mess)
-    } catch (e) {
-        await uncaughtError(mess)
-    }
-};
-
-const editQuestion = async (robot, mess) => {
-    if (await permsCheck(mess, "MANAGE_ROLES")) return
-    let res = {}
-    await connectToDb().then(async mongoose => {
-        try {
-            res = await serverSchema.findOne({server: mess.guild.id})
-        } finally {
-            await mongoose.endSession()
-        }
-    })
-    let questions = res.questions;
-    let id = parseInt(await awaitMessages(mess, {content: "Write id of question / Напишите id вопроса"}))
-    let question = {};
-
-    for (let q of questions) {
-        if (q.questionID === id) {
-            question = q;
-            break;
-        }
     }
 
-    if (isNaN(id) || Object.keys(question).length === 0) {
-        await invalidQuestionID(mess)
-        return;
-    }
-
-    let answers = "";
-    for (let i = 0; i < question.answers.length; i++) {
-        answers += `${i + 1}. ${question.answers[i]}\n`;
-    }
-
-    let param = await chooseOptionMenu(mess, [
-        {
-            label: "Question / Вопрос",
-            description: "Correct the question without rewriting the answers / Исправить вопрос без перезаписи ответов",
-            value: "question"
-        },
-        {
-            label: "Right answer / Правильный ответ",
-            description: "Change the right answer's number / Изменить номер правильного ответа",
-            value: "right_answer"
-        },
-        {
-            label: "Answers / Ответы",
-            description: "Rewriting all answers for the question / Перезапись всех ответов для вопроса",
-            value: "answers"
-        },
-        {
-            label: "Images / Изображения",
-            description: "Rewriting all images' links for the question / Перезапись всех ссылок на изображения для вопроса",
-            value: "images"
-        }
-    ], {
-        embeds: [
-            await createEmbed({
-                title:
-                    "Что вы хотите изменить? Напишите название свойства на английском со строчной буквы или --END-- для прекращения процесса / What do you wanna change? Write a property name in lowercase or --END-- to stop the process",
-                author: `ID of question - ${question.questionID}`,
-                description: `Вопрос / Question - ${question.question}
-    Ответы / Answers: \n\`\`\`${answers}\`\`\`
-    Правильный ответ / Right answer - ${question.answer}`,
-                footer:
-                    "Параметры, которые можно изменить / Parameters that can be changed - question, answers, right answer, images",
-            }, mess.guild.id),
-        ],
-        files: question.images,
-    })
-
-    if (param === "--END--") {
-        await operationTerminatedMsg(mess)
-        return;
-    }
-
-    switch (param) {
-        case "question":
-            question.question = await awaitMessages(mess, {content: "Напишите новый вопрос: / Write new question: "})
-            break;
-        case "right_answer":
-            question.answer = parseInt(await awaitMessages(mess, {content: "Напишите номер правильного ответа: / Write right answer number: "}));
-            break;
-        case "answers":
-            let countOfAnswers = await awaitMessages(mess, {
-                    content: "Please write count of answers. / Пожалуйста напишите количество ответов для вопроса",
-                }),
-                answers = [];
-
-            countOfAnswers = parseInt(countOfAnswers)
-            if (isNaN(countOfAnswers)) {
-                await invalidValueError(mess)
-                return
+    static async #showChoosable(client, guild_id, channel_id, question) {
+        const channel = client.channels.cache.get(channel_id)
+        let ans = ""
+        for (const key of Object.keys(question.answers)) {
+            if (key === "rightChoosable") {
+                ans += `Right answer: ${question.answers.rightChoosable + 1}`
+                continue
             }
 
-            for (let i = 0; i < countOfAnswers; i++) {
-                answers.push(await awaitMessages(mess, {
-                    content: `Please write ${
-                        i === 0 ? "first" : "next"
-                    } answer for question /
-          Пожалуйста напишите ${
-                        i === 0 ? "первый" : "следующий"
-                    } ответ для вопроса`,
-                }))
-            }
-            question.answers = answers;
-            question.answer = parseInt(await awaitMessages(mess, {content: "Напишите номер правильного ответа: / Write right answer number: "}));
-            break;
-        case "images":
-            let images = [];
-            let countOfImages = await chooseOptionMenu(mess, [
-                {
-                    label: 'No images',
-                    description: '',
-                    value: 'zero',
-                },
-                {
-                    label: '1',
-                    description: '',
-                    value: 'one',
-                },
-                {
-                    label: '2',
-                    description: '',
-                    value: 'two',
-                },
-                {
-                    label: '3',
-                    description: '',
-                    value: 'three',
-                },
-                {
-                    label: '4',
-                    description: '',
-                    value: 'four',
-                },
-                {
-                    label: '5',
-                    description: '',
-                    value: 'five',
-                }
-            ], "Please choose count of images for question. / Пожалуйста выберите количество картинок для вопроса. ")
-
-            countOfImages = countOfImages[0]
-
-            switch (countOfImages) {
-                case "zero":
-                    countOfImages = 0;
-                    break
-                case "one":
-                    countOfImages = 1;
-                    break
-                case "two":
-                    countOfImages = 2;
-                    break
-                case "three":
-                    countOfImages = 3;
-                    break
-                case "four":
-                    countOfImages = 4;
-                    break
-                case "five":
-                    countOfImages = 5;
-                    break
-                default:
-            }
-
-            if (typeof countOfImages === "number") {
-                await noResponseError(mess)
-                return
-            }
-
-            for (let i = 0; i < countOfImages; i++) {
-                let image = await awaitMessages(mess, {
-                    content: `Please write ${
-                        i === 0 ? "first" : "next"
-                    } link with image. Image must be uploaded to discord as message earlier. /
-      Пожалуйста напишите ${
-                        i === 0 ? "первую" : "следующую"
-                    } ссылку с картинкой. Картинка должна быть загружена в виде сообщения в discord ранее.`,
-                })
-                if (
-                    image.indexOf("https://media.discordapp.net/attachments/") === -1 ||
-                    image.length < 42
-                ) {
-                    await mess.channel.send(
-                        {content: "Invalid URL to picture. / Невалидная ссылка на картинку"}
-                    );
-                    countOfImages++;
-                } else {
-                    images.push(image.split("?")[0]);
-                }
-            }
-            question.images = images;
-            break;
-        default:
-            await mess.channel.send({content: "Invalid param / Невалидный параметр"});
-            return;
-    }
-
-    let isEdit = await confirmActions(mess)
-
-    if (isEdit) {
-        for (let q of questions) {
-            if (q.questionID === id) {
-                q = question;
-                break;
-            }
-        }
-        await connectToDb().then(async mongoose => {
-            try {
-                await serverSchema.updateOne({server: mess.guild.id}, {questions})
-            } finally {
-                await mongoose.endSession()
-            }
-        })
-        await defaultSuccessMsg(mess)
-    } else {
-        await operationTerminatedMsg(mess)
-    }
-};
-
-const showQuestion = async (robot, mess) => {
-    if (await permsCheck(mess, "MANAGE_ROLES")) return
-    let res = {}
-    await connectToDb().then(async mongoose => {
-        try {
-            res = await serverSchema.findOne({server: mess.guild.id})
-        } finally {
-            await mongoose.endSession()
-        }
-    })
-    let questions = res.questions;
-    let id = await awaitMessages(mess, `Please write id of question (or "all" to see all) / Пожалуйста напишите id вопроса (или "all", чтобы просмотреть все)`)
-    let question = {};
-
-    if (id === "all") {
-        let str = "";
-
-        questions = questions.filter(q => q !== null)
-
-        const sortedQuestions = questions.sort((a, b) =>
-            a.questionID > b.questionID ? 1 : -1
-        );
-
-        for (let q of sortedQuestions) {
-            str += `${q.questionID} - ${q.question}\n`;
+            ans += `${parseInt(key) + 1}: ${question.answers[key]}\n`
         }
 
-        await mess.channel.send({
+        await channel.send({
             embeds: [
-                await createEmbed({
-                    title: "Questions / Вопросы",
-                    description: str,
-                }, mess.guild.id),
+                await Embeds.create({
+                    title: `${question.question}`,
+                    author: `ID of question - ${question.question_id}`,
+                    description: `Answers: \n\`\`\`${ans}\`\`\``,
+                }, guild_id),
             ],
+            files: question.images,
         });
-
-        return
     }
 
-    id = parseInt(id)
+    static async #showTypeable(client, guild_id, channel_id, question) {
+        const channel = client.channels.cache.get(channel_id)
 
-    for (let q of questions) {
-        if (q === null) {
-            continue;
-        }
-
-        if (q.questionID === id) {
-            question = q;
-            break;
-        }
+        await channel.send({
+            embeds: [
+                await Embeds.create({
+                    title: `${question.question}`,
+                    author: `ID of question - ${question.question_id}`,
+                    description: `Answer: \n\`\`\`${question.answers.typeable}\`\`\``,
+                }, guild_id),
+            ],
+            files: question.images,
+        });
     }
-
-    if (isNaN(id) || Object.keys(question).length === 0) {
-        await invalidQuestionID(mess)
-        return;
-    }
-
-    let answers = "";
-    for (let i = 0; i < question.answers.length; i++) {
-        answers += `${i + 1}. ${question.answers[i]}\n`;
-    }
-
-    await mess.channel.send({
-        embeds: [
-            await createEmbed({
-                title: "1",
-                author: `ID of question - ${question.questionID}`,
-                description: `Вопрос / Question - ${question.question}
-    Ответы / Answers: \n\`\`\`${answers}\`\`\`
-    Правильный ответ / Right answer - ${question.answer}`,
-            }, mess.guild.id),
-        ],
-        files: question.images,
-    });
 }
 
-module.exports = {
-    addQuestion,
-    deleteQuestion,
-    editQuestion,
-    showQuestion
-};
+module.exports = new Questions()

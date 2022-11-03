@@ -1,390 +1,386 @@
-const {createEmbed} = require("../communication/embeds/embeds");
-const Discord = require("discord.js");
-const connectToDb = require("../mongoconnect");
-const serverSchema = require("../schemas/server-schema");
+const {MessageEmbed} = require("discord.js");
+const Embeds = require('../functions/Embeds')
+const Interactions = require('../functions/Interactions')
+const settingsController = require('../database/controllers/settings.controller')
 
-const botinfo = async (robot, mess) => {
-    let res = {}
-    await connectToDb().then(async (mongoose) => {
-        try {
-            res = await serverSchema.findOne({server: mess.guild.id})
-        } finally {
-            await mongoose.endSession()
-        }
-    })
-
-    const prefix = res.prefix ?? "q!"
-    const developer = await robot.users.fetch("749999134919884890")
-
-    await mess.channel.send({
-        embeds: [
-            await createEmbed({
-                title: "Information about the bot / Инфорамция о боте",
-                description: `**Developed by / Разработал** - <@749999134919884890> (@${developer.username}#${developer.discriminator})
-      **Prefix / Префикс** - ${prefix}
-      **Help command / Команда справки** - ${prefix}help`
-            }, mess.guild.id),
-        ],
-    });
-};
-
-const help = async (robot, mess) => {
-    let res = {}
-    await connectToDb().then(async (mongoose) => {
-        try {
-            res = await serverSchema.findOne({server: mess.guild.id})
-        } finally {
-            await mongoose.endSession()
-        }
-    })
-
-    const prefix = res.prefix ?? "q!"
-
-    await mess.channel.send({
-        embeds: [
-            new Discord.MessageEmbed()
-                .setColor("#0000ff")
-                .setTitle("Bot commands / Команды бота")
-                .setDescription(
-                    "All commands of the bot are presented here. Some of them may be unavailable due to lack of appropriate rights. For detailed help on a command, write ```q!command rules``` replacing the \"rules\" with the desired command  \n Здесь представлены все команды бота. Некоторые из них могут быть недоступны из-за отсутствия соответствующих прав. Для просмотра подробной справки по команде напишите ```q!command rules```, заменив rules на нужную команду."
-                )
-                .addFields([
-                    {
-                        name: "**Game rules / Правила игры**",
-                        value: `\`\`\`${prefix}rewrite\`\`\` \`\`\`${prefix}rules\`\`\` \`\`\`${prefix}addrule\`\`\``,
-                        inline: true,
-                    },
-                    {
-                        name: "Game limiter / Ограничитель игр",
-                        value: `\`\`\`${prefix}maxgames\`\`\` \`\`\`${prefix}cleargames\`\`\` \`\`\`${prefix}gamescount\`\`\``,
-                        inline: true
-                    },
-                    {
-                        name: "**Help / Справка**",
-                        value: `\`\`\`${prefix}help\`\`\` \`\`\`${prefix}botinfo\`\`\` \`\`\`${prefix}command\`\`\``,
-                        inline: true,
-                    },
-                    {
-                        name: "**Questions / Вопросы **",
-                        value:
-                            `\`\`\`${prefix}add\`\`\` \`\`\`${prefix}delete\`\`\` \`\`\`${prefix}edit\`\`\` \`\`\`${prefix}show\`\`\``,
-                        inline: true,
-                    },
-                    {
-                        name: "**Bot settings / Настройки бота**",
-                        value:
-                            `\`\`\`${prefix}settings\`\`\` \`\`\`${prefix}update\`\`\``,
-                        inline: true,
-                    },
-                    {
-                        name: "**Leaderboard / Лидерборд**",
-                        value: `\`\`\`${prefix}lb\`\`\` \`\`\`${prefix}clearLB\`\`\``,
-                        inline: true,
-                    },
-                    {
-                        name: "**Game / Игра**",
-                        value: `\`\`\`${prefix}game\`\`\``,
-                        inline: true,
-                    },
-                    {
-                        name: "Other / Другое",
-                        value: `\`\`\`${prefix}export\`\`\`  \`\`\`${prefix}reset\`\`\``,
-                        inline: true
-                    }
-                ]),
-        ],
-    });
-};
-
-const commandHelp = async (robot, mess, args) => {
-    let res = {}
-    await connectToDb().then(async (mongoose) => {
-        try {
-            res = await serverSchema.findOne({server: mess.guild.id})
-        } finally {
-            await mongoose.endSession()
-        }
-    })
-
-    const prefix = res.prefix ?? "q!"
-    const command = args[1];
-
-    switch (command) {
-        case "rewriterules":
-            await mess.channel.send({
-                embeds: [
-                    await createEmbed({
-                        title: `${prefix}rewrite`,
-                        description: `**Syntax / Синтаксис** - "${prefix}rewrite <rules>"
-      **<rules>** - new rules / новые правила
-      **Appointment / Назначение** - setting new game rules / установка новых правил игры
-      **Minimal permissions / Минимальные права** - MANAGE_ROLES`,
-                    }, mess.guild.id),
-                ],
-            });
-            break;
-        case "rules":
-            await mess.channel.send({
-                embeds: [
-                    await createEmbed({
-                        title: `${prefix}rules`,
-                        description: `**Syntax / Синтаксис** - "${prefix}rules"
-      **Appointment / Назначение** - showing the rules of the game/ показ правил игры
-      **Minimal permissions / Минимальные права** - none`,
-                    }, mess.guild.id),
-                ],
-            });
-            break;
-        case "help":
-            await mess.channel.send({
-                embeds: [
-                    await createEmbed({
-                        title: `${prefix}help`,
-                        description: `**Syntax / Синтаксис** - "${prefix}help"
-      **Appointment / Назначение** - help / справка
-      **Minimal permissions / Минимальные права** - none`,
-                    }, mess.guild.id),
-                ],
-            });
-            break;
-        case "botinfo":
-            await mess.channel.send({
-                embeds: [
-                    await createEmbed({
-                        title: `${prefix}botinfo`,
-                        description: `**Syntax / Синтаксис** - "${prefix}botinfo"
-      **Appointment / Назначение** - bot information / информация о боте
-      **Minimal permissions / Минимальные права** - none`,
-                    }, mess.guild.id),
-                ],
-            });
-            break;
-        case "command":
-            await mess.channel.send({
-                embeds: [
-                    await createEmbed({
-                        title: `${prefix}command`,
-                        description: `**Syntax / Синтаксис** - "${prefix}command <command>"
-        **<command>** - get help about command / получить справку о команде
-        **Appointment / Назначение** - help / справка
-        **Minimal permissions / Минимальные права** - none`,
-                    }, mess.guild.id),
-                ],
-            });
-            break;
-        case "game":
-            await mess.channel.send({
-                embeds: [
-                    await createEmbed({
-                        title: `${prefix}game`,
-                        description: `**Syntax / Синтаксис** - "${prefix}game <flag>"
-      <flag> - condition with which the game can start. Optional argument (you can omit it). In order to find out what the conditions are, write "${prefix}command game-flags" / условие с которым может стартовать игра. Необязательный аргумент (можно не писать). Для того, чтобы узнать какие имеются условия напишите "${prefix}command game-flags"
-      **Appointment / Назначение** - starting a game / стартует игру
-      **Minimal permissions / Минимальные права** - none`,
-                    }, mess.guild.id),
-                ],
-            });
-            break;
-        case "game-flags":
-            await mess.channel.send({
-                embeds: [
-                    await createEmbed({
-                        title: `Flags for q!game`,
-                        description: `__**-y, -yes**__ = agree with the rules (the bot will not ask the corresponding question) / согласен(а) с правилами (бот не будет задавать соответствующего вопроса)
-                        
-                        __**-ex, -exclude**__ = exclude some questions from the game (id of questions are indicated later) / исключить некоторые вопросы из игры (id вопросов указываются позже)
-                        
-                        __**-only**__ = make a game only from certain questions (id will be indicated later). Attention, there is a high probability of frequent repetition of questions! / составить игру только из определенных вопросов (id указываются позже). Внимание, высока вероятность частого повтора вопросов!
-                        
-                        __**-th, -threads**__ = threads mode (the game is played not in the channel, but in the branches) / режим веток (игра проводится не в канале, а в ветках)
-                        
-                        **_Note: Using the -ex(-exclude) flags significantly reduces the likelihood of the specified question(s) being dropped, but does not exclude it (them)!
-                        Примечание: использование флагов -ex(-exclude) значительно уменьшает вероятность выпадения указанного вопроса(ов), но не исключает его(их)!_**
-                        `,
-                    }, mess.guild.id),
-                ],
-            });
-            break;
-        case "lb":
-            await mess.channel.send({
-                embeds: [
-                    await createEmbed({
-                        title: `${prefix}lb`,
-                        description: `**Syntax / Синтаксис** - "${prefix}lb"
-      **Appointment / Назначение** - show leaderboard / показывает лидерборд
-      **Minimal permissions / Минимальные права** - none`,
-                    }, mess.guild.id),
-                ],
-            });
-            break;
-        case "clearLB":
-            await mess.channel.send({
-                embeds: [
-                    await createEmbed({
-                        title: `${prefix}clearLB`,
-                        description: `**Syntax / Синтаксис** - "${prefix}clearLB <user>"
-      <user> - the user whose data on the leaderboard is deleted (all for all users) / пользователь, данные которого на лидерборде удаляются (all для всех пользователей)
-      **Appointment / Назначение** - permanent cleaning of the leaderboard / безвозвратная очистка лидерборда
-      **Minimal permissions / Минимальные права** - ADMINISTRATOR`,
-                    }, mess.guild.id),
-                ],
-            });
-            break;
-        case "delete":
-            await mess.channel.send({
-                embeds: [
-                    await createEmbed({
-                        title: `${prefix}delete`,
-                        description: `**Syntax / Синтаксис** - "${prefix}delete <id>"
-      **<id>** - question id / id вопроса
-      **Appointment / Назначение** - deleting question from db / удаление вопроса из базы
-      **Minimal permissions / Минимальные права** - MANAGE_ROLES for deleting 1-4 questions at 1 time & ADMINISTRATOR for deleting 5+ questions at 1 time`,
-                    }, mess.guild.id),
-                ],
-            });
-            break;
-        case "add":
-            await mess.channel.send({
-                embeds: [
-                    await createEmbed({
-                        title: `${prefix}add`,
-                        description: `**Syntax / Синтаксис** - "${prefix}add <count>"
-      <count> - the number of questions to add at a time (without calling the command again) / количество вопросов, которые надо добавить за 1 раз (без повторного вызова команды)
-      **Appointment / Назначение** - add question to db / добавление вопроса в базу
-      **Minimal permissions / Минимальные права** - MANAGE_ROLES`,
-                    }, mess.guild.id),
-                ],
-            });
-            break;
-        case "edit":
-            await mess.channel.send({
-                embeds: [
-                    await createEmbed({
-                        title: `${prefix}edit`,
-                        description: `**Syntax / Синтаксис** - "${prefix}edit <id>"
-        **<id>** - question id / id вопроса
-        **Appointment / Назначение** - editing already added question / изменение уже добавленного вопроса
-        **Minimal permissions / Минимальные права** - MANAGE_ROLES`,
-                    }, mess.guild.id),
-                ],
-            });
-            break;
-        case "show":
-            await mess.channel.send({
-                embeds: [
-                    await createEmbed({
-                        title: `${prefix}show`,
-                        description: `**Syntax / Синтаксис** - "${prefix}show <id>"
-**<id>** - question id or "all" to see all questions / id вопроса или "all", чтобы увидеть все вопросы
-**Appointment / Назначение** - showing the question in preview mode / показ вопроса в режиме предпросмотра
-**Minimal permissions / Минимальные права** - MANAGE_ROLES`,
-                    }, mess.guild.id),
-                ],
-            })
-            break;
-        case "maxgames":
-            await mess.channel.send({
-                embeds: [
-                    await createEmbed({
-                        title: `${prefix}maxgames`,
-                        description: `**Syntax / Синтаксис** - "${prefix}maxgames"
-          **Appointment / Назначение** - setting the parameter of the maximum running games by 1 person per day / установка параметра максимально запущенных игр 1 человеком в день
-          **Minimal permissions / Минимальные права** - ADMINISTRATOR`,
-                    }, mess.guild.id),
-                ],
-            });
-            break;
-        case "addrule":
-            await mess.channel.send({
-                embeds: [
-                    await createEmbed({
-                        title: `${prefix}addrule`,
-                        description: `**Syntax / Синтаксис** - "${prefix}addrule <rule>"
-          **<rule>** - new rule to be added / новое правило, которое надо добавить
-          **Appointment / Назначение** - updating rules / обновление правил
-          **Minimal permissions / Минимальные права** - MANAGE_ROLES`,
-                    }, mess.guild.id),
-                ],
-            });
-            break;
-        case "cleargames":
-            await mess.channel.send({
-                embeds: [
-                    await createEmbed({
-                        title: `${prefix}cleargames`,
-                        description: `**Syntax / Синтаксис** - "${prefix}cleargames <user>"
-          **<user>** - the person whose games information needs to be deleted (ping or "all" to clear the entire list)/ человек, инфу по играм которого надо удалить (пинг или "all" для очистки всего списка)
-          **Appointment / Назначение** - clearing games list for game limiter / очистка списка игр для ограничителя игр
-          **Minimal permissions / Минимальные права** - ADMINISTRATOR`,
-                    }, mess.guild.id),
-                ],
-            });
-            break;
-        case "gamescount":
-            await mess.channel.send({
-                embeds: [
-                    await createEmbed({
-                        title: `${prefix}gamescount`,
-                        description: `**Syntax / Синтаксис** - "${prefix}gamescount"
-          **Appointment / Назначение** - show started games by user / показ начатых игр игроком
-          **Minimal permissions / Минимальные права** - none`,
-                    }, mess.guild.id),
-                ],
-            });
-            break;
-        case "export":
-            await mess.channel.send({
-                embeds: [
-                    await createEmbed({
-                        title: `${prefix}export`,
-                        description: `**Syntax / Синтаксис** - "${prefix}export"
-          **Appointment / Назначение** - export questions from the database to a .txt file / экспорт  вопросов из базы в файл .txt
-          **Minimal permissions / Минимальные права** - MANAGE_ROLES`,
-                    }, mess.guild.id),
-                ],
-            });
-            break;
-        case "settings":
-            await mess.channel.send({
-                embeds: [
-                    await createEmbed({
-                        title: `${prefix}settings`,
-                        description: `**Syntax / Синтаксис** - "${prefix}settings"
-          **Appointment / Назначение** - show current bot settings / показ текущих настроек бота
-          **Minimal permissions / Минимальные права** - MANAGE_ROLES`
-                    }, mess.guild.id)
-                ]
-            })
-            break
-        case "reset":
-            await mess.channel.send({
-                embeds: [
-                    await createEmbed({
-                        title: `${prefix}reset`,
-                        description: `**Syntax / Синтаксис** - "${prefix}reset"
-          **Appointment / Назначение** - resets bot settings to standard (it will also delete all questions and rules, clear the leaderboard) / сбрасывает настройки бота до стандартных (это также удалит все вопросы и правила, очистит лидерборд)
-          **Minimal permissions / Минимальные права** - ADMINISTRATOR`
-                    })
-                ]
-            })
-            break
-        case "update":
-            await mess.channel.send({
-                embeds: [
-                    await createEmbed({
-                        title: `${prefix}update`,
-                        description: `**Syntax / Синтаксис** - "${prefix}update"
-          **Appointment / Назначение** - updates bot settings / обновляет правила сервера
-          **Minimal permissions / Минимальные права** - MANAGE_ROLES`
-                    }, mess.guild.id)
-                ]
-            })
-            break
-        default:
-            await mess.channel.send({
-                content: "Command not found / Команда не найдена",
-            });
+class Help {
+    constructor() {
     }
-};
 
-module.exports = {botinfo, help, commandHelp};
+    async botinfo(msg, client) {
+        const developer = await client.users.fetch("749999134919884890")
+
+        await msg.channel.send({
+            embeds: [await Embeds.create({
+                title: "Information about the bot",
+                description: `**Developed by** - <@749999134919884890> (@${developer.username}#${developer.discriminator})
+      **Default prefix** - q!
+      **Help command** - q!help`
+            }, msg.guild.id)]
+        })
+    }
+
+    async help(msg, client) {
+        const settings = await settingsController.getSettings(msg.guild.id)
+        const prefix = settings.prefix ?? "q!"
+
+        await msg.channel.send({
+            embeds: [
+                new MessageEmbed()
+                    .setColor(settings.embedColor ?? "#0000ff")
+                    .setTitle("Bot commands")
+                    .setDescription(
+                        "All commands of the bot are presented here. Some of them may be unavailable due to lack of appropriate rights. For detailed help on a command, write ```q!command rules``` replacing the \"rules\" with the desired command"
+                    )
+                    .addFields([
+                        {
+                            name: "**Game rules**",
+                            value: `\`\`\`${prefix}rewriterules\`\`\` \`\`\`${prefix}rules\`\`\` \`\`\`${prefix}addrule\`\`\``,
+                            inline: true,
+                        },
+                        {
+                            name: "**Help**",
+                            value: `\`\`\`${prefix}help\`\`\` \`\`\`${prefix}botinfo\`\`\` \`\`\`${prefix}commandhelp\`\`\``,
+                            inline: true,
+                        },
+                        {
+                            name: "**Bot settings**",
+                            value:
+                                `\`\`\`${prefix}settings\`\`\` \`\`\`${prefix}update\`\`\` \`\`\`${prefix}reset\`\`\``,
+                            inline: true,
+                        },
+                        {
+                            name: "**Questions**",
+                            value:
+                                `\`\`\`${prefix}add\`\`\` \`\`\`${prefix}delete\`\`\` \`\`\`${prefix}edit\`\`\` \`\`\`${prefix}show\`\`\``,
+                            inline: true,
+                        },
+                        {
+                            name: "**Leaderboard**",
+                            value: `\`\`\`${prefix}lb\`\`\` \`\`\`${prefix}clearLB\`\`\``,
+                            inline: true,
+                        },
+                        {
+                            name: "**Quiz**",
+                            value: `\`\`\`${prefix}quiz\`\`\``,
+                            inline: true,
+                        },
+                        {
+                            name: "**Questions export**",
+                            value: `\`\`\`${prefix}export\`\`\``,
+                            inline: true
+                        }
+                    ]),
+            ],
+        });
+    }
+
+    async commandHelp(msg, client) {
+        const settings = await settingsController.getSettings(msg.guild.id)
+        const prefix = settings.prefix ?? "q!"
+
+        const command = await Interactions.menu(client, msg.guild.id, msg.channel.id, [
+            {
+                label: "rewriterules",
+                description: "Сomplete rewriting of the rules",
+                value: "0"
+            },
+            {
+                label: "rules",
+                description: "View rules",
+                value: "1"
+            },
+            {
+                label: "addrule",
+                description: "Adding rules to the end of the current ones",
+                value: "2"
+            },
+            {
+                label: "help",
+                description: "Help",
+                value: "3"
+            },
+            {
+                label: "botinfo",
+                description: "Bot details",
+                value: "4"
+            },
+            {
+                label: "commandhelp",
+                description: "Help for each bot command",
+                value: "5"
+            },
+            {
+                label: "settings",
+                description: "View settings",
+                value: "6"
+            },
+            {
+                label: "update",
+                description: "Settings update",
+                value: "7"
+            },
+            {
+                label: "reset",
+                description: "Reset settings to default",
+                value: "8"
+            },
+            {
+                label: "add",
+                description: "Adding questions",
+                value: "9"
+            },
+            {
+                label: "delete",
+                description: "Deleting questions",
+                value: "10"
+            },
+            {
+                label: "edit",
+                description: "Editing questions",
+                value: "11"
+            },
+            {
+                label: "show",
+                description: "Viewing questions",
+                value: "12"
+            },
+            {
+                label: "lb",
+                description: "View leaderboard",
+                value: "13"
+            },
+            {
+                label: "clearlb",
+                description: "Clearing the leaderboard",
+                value: "14"
+            },
+            {
+                label: "quiz",
+                description: "Quiz start command",
+                value: "15"
+            },
+            {
+                label: "export",
+                description: "Exporting questions",
+                value: "16"
+            }
+        ], {
+            embeds: [await Embeds.create({
+                title: "Please choose the command for help"
+            }, msg.guild.id)]
+        })
+
+        switch (command) {
+            case 0:
+                await msg.channel.send({
+                    embeds: [
+                        await Embeds.create({
+                            title: `${prefix}rewriterules`,
+                            description: `**Syntax** - "${prefix}rewrite <rules>"
+      **<rules>** - new rules
+      **Appointment** - setting new game rules
+      **Required permissions** - MANAGE_ROLES`,
+                        }, msg.guild.id),
+                    ],
+                });
+                break;
+            case 1:
+                await msg.channel.send({
+                    embeds: [
+                        await Embeds.create({
+                            title: `${prefix}rules`,
+                            description: `**Syntax** - "${prefix}rules"
+      **Appointment** - showing the rules of the game
+      **Required permissions** - none`,
+                        }, msg.guild.id),
+                    ],
+                });
+                break;
+            case 2:
+                await msg.channel.send({
+                    embeds: [
+                        await Embeds.create({
+                            title: `${prefix}addrule`,
+                            description: `**Syntax** - "${prefix}addrule"
+          **Appointment** - updating rules
+          **Required permissions** - MANAGE_ROLES`,
+                        }, msg.guild.id),
+                    ],
+                });
+                break;
+            case 3:
+                await msg.channel.send({
+                    embeds: [
+                        await Embeds.create({
+                            title: `${prefix}help`,
+                            description: `**Syntax** - "${prefix}help"
+      **Appointment** - help
+      **Required permissions** - none`,
+                        }, msg.guild.id),
+                    ],
+                });
+                break;
+            case 4:
+                await msg.channel.send({
+                    embeds: [
+                        await Embeds.create({
+                            title: `${prefix}botinfo`,
+                            description: `**Syntax** - "${prefix}botinfo"
+      **Appointment** - bot information
+      **Required permissions** - none`,
+                        }, msg.guild.id),
+                    ],
+                });
+                break;
+            case 5:
+                await msg.channel.send({
+                    embeds: [
+                        await Embeds.create({
+                            title: `${prefix}commandhelp`,
+                            description: `**Syntax** - "${prefix}commandhelp"
+        **Appointment** - help
+        **Required permissions** - none`,
+                        }, msg.guild.id),
+                    ],
+                });
+                break;
+            case 6:
+                await msg.channel.send({
+                    embeds: [
+                        await Embeds.create({
+                            title: `${prefix}settings`,
+                            description: `**Syntax** - "${prefix}settings"
+          **Appointment** - show current bot settings
+          **Required permissions** - MANAGE_ROLES`
+                        }, msg.guild.id)
+                    ]
+                })
+                break
+            case 7:
+                await msg.channel.send({
+                    embeds: [
+                        await Embeds.create({
+                            title: `${prefix}update`,
+                            description: `**Syntax** - "${prefix}update"
+          **Appointment** - updates bot settings
+          **Required permissions** - MANAGE_ROLES`
+                        }, msg.guild.id)
+                    ]
+                })
+                break
+            case 8:
+                await msg.channel.send({
+                    embeds: [
+                        await Embeds.create({
+                            title: `${prefix}reset`,
+                            description: `**Syntax** - "${prefix}reset"
+          **Appointment** - resets bot settings to standard (it will also delete all questions and rules, clear the leaderboard)
+          **Required permissions** - ADMINISTRATOR`
+                        })
+                    ]
+                })
+                break
+            case 9:
+                await msg.channel.send({
+                    embeds: [
+                        await Embeds.create({
+                            title: `${prefix}add`,
+                            description: `**Syntax** - "${prefix}add"
+      **Appointment** - add question to db
+      **Required permissions** - MANAGE_ROLES`,
+                        }, msg.guild.id),
+                    ],
+                });
+                break;
+            case 10:
+                await msg.channel.send({
+                    embeds: [
+                        await Embeds.create({
+                            title: `${prefix}delete`,
+                            description: `**Syntax** - "${prefix}delete"
+      **Appointment** - deleting question from db
+      **Required permissions** - MANAGE_ROLES for deleting 1-4 questions at 1 time & ADMINISTRATOR for deleting 5+ questions at 1 time`,
+                        }, msg.guild.id),
+                    ],
+                });
+                break;
+            case 11:
+                await msg.channel.send({
+                    embeds: [
+                        await Embeds.create({
+                            title: `${prefix}edit`,
+                            description: `**Syntax** - "${prefix}edit"
+        **Appointment** - editing already added question
+        **Required permissions** - MANAGE_ROLES`,
+                        }, msg.guild.id),
+                    ],
+                });
+                break;
+            case 12:
+                await msg.channel.send({
+                    embeds: [
+                        await Embeds.create({
+                            title: `${prefix}show`,
+                            description: `**Syntax** - "${prefix}show"
+**Appointment** - showing the question in preview mode
+**Required permissions** - MANAGE_ROLES`,
+                        }, msg.guild.id),
+                    ],
+                })
+                break;
+            case 13:
+                await msg.channel.send({
+                    embeds: [
+                        await Embeds.create({
+                            title: `${prefix}lb`,
+                            description: `**Syntax** - "${prefix}lb"
+      **Appointment** - show leaderboard
+      **Required permissions** - none`,
+                        }, msg.guild.id),
+                    ],
+                });
+                break;
+            case 14:
+                await msg.channel.send({
+                    embeds: [
+                        await Embeds.create({
+                            title: `${prefix}clearLB`,
+                            description: `**Syntax** - "${prefix}clearLB"
+      **Appointment** - permanent cleaning of the leaderboard
+      **Required permissions** - ADMINISTRATOR`,
+                        }, msg.guild.id),
+                    ],
+                });
+                break;
+            case 15:
+                await msg.channel.send({
+                    embeds: [
+                        await Embeds.create({
+                            title: `${prefix}quiz`,
+                            description: `**Syntax** - "${prefix}quiz"
+      **Appointment** - starting a quiz
+      **Required permissions** - none`,
+                        }, msg.guild.id),
+                    ],
+                });
+                break;
+            case 16:
+                await msg.channel.send({
+                    embeds: [
+                        await Embeds.create({
+                            title: `${prefix}export`,
+                            description: `**Syntax** - "${prefix}export"
+          **Appointment** - export questions from the database to a .txt file
+          **Required permissions** - MANAGE_ROLES`,
+                        }, msg.guild.id),
+                    ],
+                });
+                break;
+            default:
+                await Embeds.errors.invalidValue(client, msg.guild.id, msg.channel.id)
+        }
+    }
+}
+
+module.exports = new Help()
